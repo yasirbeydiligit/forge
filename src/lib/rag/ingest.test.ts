@@ -25,15 +25,24 @@ type Captured = {
   documentInserts: Record<string, unknown>[];
   chunkInserts: Record<string, unknown>[][];
   updates: { values: Record<string, unknown>; id: unknown }[];
+  deletes: { eq: [string, unknown]; neq: [string, unknown] }[];
 };
 
 /**
- * Build a fake admin client. `existingReady` is the row returned by the dedup
- * `maybeSingle()` lookups (null = nothing exists). The inserted document row is
- * returned from insert().select().single() with a fixed id.
+ * Build a fake admin client.
+ *
+ * The dedup step now looks up an existing `library_documents` row by
+ * `content_hash` (and, when set, by `doi`) regardless of status:
+ *   - `existing` is the row returned by those `select().eq().maybeSingle()`
+ *     lookups (null = nothing exists);
+ *   - a `ready` row short-circuits and is returned untouched;
+ *   - a non-ready row is DELETE-d (captured in `deletes`) before re-ingesting.
+ *
+ * The inserted document row is returned from insert().select().single() with a
+ * fixed id.
  */
 function makeAdmin(opts: {
-  existingReady?: Record<string, unknown> | null;
+  existing?: Record<string, unknown> | null;
   insertedId?: string;
 } = {}) {
   const captured: Captured = {
@@ -41,6 +50,7 @@ function makeAdmin(opts: {
     documentInserts: [],
     chunkInserts: [],
     updates: [],
+    deletes: [],
   };
   const insertedId = opts.insertedId ?? "doc-1";
 
@@ -56,17 +66,32 @@ function makeAdmin(opts: {
                   captured.selectEqArgs.push([c2, v2]);
                   return {
                     async maybeSingle() {
-                      return { data: opts.existingReady ?? null, error: null };
+                      return { data: opts.existing ?? null, error: null };
                     },
                   };
                 },
                 async maybeSingle() {
-                  return { data: opts.existingReady ?? null, error: null };
+                  return { data: opts.existing ?? null, error: null };
                 },
               };
             },
           };
           return eqChain;
+        },
+        delete() {
+          return {
+            eq(column: string, value: unknown) {
+              return {
+                async neq(neqColumn: string, neqValue: unknown) {
+                  captured.deletes.push({
+                    eq: [column, value],
+                    neq: [neqColumn, neqValue],
+                  });
+                  return { data: null, error: null };
+                },
+              };
+            },
+          };
         },
         insert(rows: unknown) {
           if (table === "document_chunks") {
@@ -198,18 +223,100 @@ describe("ingestDocument", () => {
       doi: null,
     };
     const embed = vi.fn();
-    const { client, captured } = makeAdmin({ existingReady: existing });
+    const { client, captured } = makeAdmin({ existing });
 
     const result = await ingestDocument({ adminClient: client, meta: { ...meta, doi: null }, pdfBuffer: pdf, embed });
 
     expect(result).toBe(existing);
     expect(captured.documentInserts).toHaveLength(0);
     expect(captured.chunkInserts).toHaveLength(0);
+    expect(captured.deletes).toHaveLength(0);
     expect(parsePdf).not.toHaveBeenCalled();
     expect(embed).not.toHaveBeenCalled();
-    // looked up by content_hash + status=ready
+    // looked up by content_hash (regardless of status)
     expect(captured.selectEqArgs).toContainEqual(["content_hash", sha256Hex(pdf)]);
-    expect(captured.selectEqArgs).toContainEqual(["status", "ready"]);
+  });
+
+  it("re-ingests over a non-ready existing row matched by content_hash: deletes it first, then ingests to ready", async () => {
+    const stale = {
+      id: "stale-1",
+      status: "failed",
+      content_hash: sha256Hex(pdf),
+      doi: null,
+    };
+    parsePdf.mockResolvedValue([{ pageNumber: 1, text: "page one" }]);
+    chunkPages.mockReturnValue([
+      { chunkIndex: 0, pageNumber: 1, charStart: 0, charEnd: 8, content: "page one" },
+    ]);
+    const embed = vi.fn().mockResolvedValue([vec(0.1)]);
+    const { client, captured } = makeAdmin({ existing: stale });
+
+    const result = await ingestDocument({
+      adminClient: client,
+      meta: { ...meta, doi: null },
+      pdfBuffer: pdf,
+      embed,
+    });
+
+    // the stale (non-ready) row was deleted by content_hash, scoped to non-ready
+    expect(captured.deletes).toContainEqual({
+      eq: ["content_hash", sha256Hex(pdf)],
+      neq: ["status", "ready"],
+    });
+    // then a fresh row was inserted as processing and brought to ready
+    expect(captured.documentInserts).toHaveLength(1);
+    expect(captured.documentInserts[0].status).toBe("processing");
+    expect(embed).toHaveBeenCalledOnce();
+    expect(result.status).toBe("ready");
+  });
+
+  it("re-ingests over a non-ready existing row matched by doi: deletes it first, then ingests to ready", async () => {
+    const stale = {
+      id: "stale-doi-1",
+      status: "processing",
+      content_hash: "some-other-hash",
+      doi: meta.doi ?? null,
+    };
+    parsePdf.mockResolvedValue([{ pageNumber: 1, text: "page one" }]);
+    chunkPages.mockReturnValue([
+      { chunkIndex: 0, pageNumber: 1, charStart: 0, charEnd: 8, content: "page one" },
+    ]);
+    const embed = vi.fn().mockResolvedValue([vec(0.1)]);
+    const { client, captured } = makeAdmin({ existing: stale });
+
+    const result = await ingestDocument({
+      adminClient: client,
+      meta, // meta.doi is set
+      pdfBuffer: pdf,
+      embed,
+    });
+
+    // both lookups (content_hash + doi) return the same stale row in this mock,
+    // so both delete the non-ready row; assert the doi-scoped delete happened.
+    expect(captured.deletes).toContainEqual({
+      eq: ["doi", meta.doi],
+      neq: ["status", "ready"],
+    });
+    expect(captured.documentInserts).toHaveLength(1);
+    expect(result.status).toBe("ready");
+  });
+
+  it("returns the existing ready doc matched by doi (no insert, no delete)", async () => {
+    const existing = {
+      id: "ready-doi-1",
+      status: "ready",
+      content_hash: "different-hash-than-this-pdf",
+      doi: meta.doi ?? null,
+    };
+    const embed = vi.fn();
+    const { client, captured } = makeAdmin({ existing });
+
+    const result = await ingestDocument({ adminClient: client, meta, pdfBuffer: pdf, embed });
+
+    expect(result).toBe(existing);
+    expect(captured.documentInserts).toHaveLength(0);
+    expect(captured.deletes).toHaveLength(0);
+    expect(embed).not.toHaveBeenCalled();
   });
 
   it("transitions processing → failed on a parse error and rethrows", async () => {

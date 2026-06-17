@@ -69,6 +69,17 @@ export type IngestAdminClient = {
     update: (values: unknown) => {
       eq: (column: string, value: unknown) => Promise<{ data: unknown; error: unknown }>;
     };
+    delete: () => {
+      eq: (
+        column: string,
+        value: unknown,
+      ) => {
+        neq: (
+          column: string,
+          value: unknown,
+        ) => Promise<{ data: unknown; error: unknown }>;
+      };
+    };
   };
 };
 
@@ -113,26 +124,49 @@ export async function ingestDocument(
   const { adminClient, meta, pdfBuffer, embed } = args;
   const contentHash = sha256Hex(pdfBuffer);
 
-  // 1) Idempotency: a ready doc with the same content hash, or the same
-  //    non-null DOI, means we've already ingested this — return it untouched.
+  // 1) Idempotency + re-run safety. `content_hash` (and `doi`) carry a UNIQUE
+  //    constraint, so we must reconcile against ANY existing row — not just
+  //    `ready` ones — before inserting. For a given identifier:
+  //      - a `ready` row means we've already ingested this → return it untouched;
+  //      - a non-ready row (a prior `failed`/`processing` attempt) would collide
+  //        on the UNIQUE constraint, so we DELETE it first (its chunks
+  //        cascade-delete via the FK) and then re-ingest from scratch.
   const byHash = await adminClient
     .from("library_documents")
     .select("*")
     .eq("content_hash", contentHash)
-    .eq("status", "ready")
     .maybeSingle();
   const existingByHash = unwrap(byHash, "Mevcut belge kontrolü (content_hash) başarısız");
-  if (existingByHash) return existingByHash;
+  if (existingByHash) {
+    if (existingByHash.status === "ready") return existingByHash;
+    unwrap(
+      await adminClient
+        .from("library_documents")
+        .delete()
+        .eq("content_hash", contentHash)
+        .neq("status", "ready"),
+      "Eski (hazır olmayan) belge silinemedi (content_hash)",
+    );
+  }
 
   if (meta.doi) {
     const byDoi = await adminClient
       .from("library_documents")
       .select("*")
       .eq("doi", meta.doi)
-      .eq("status", "ready")
       .maybeSingle();
     const existingByDoi = unwrap(byDoi, "Mevcut belge kontrolü (doi) başarısız");
-    if (existingByDoi) return existingByDoi;
+    if (existingByDoi) {
+      if (existingByDoi.status === "ready") return existingByDoi;
+      unwrap(
+        await adminClient
+          .from("library_documents")
+          .delete()
+          .eq("doi", meta.doi)
+          .neq("status", "ready"),
+        "Eski (hazır olmayan) belge silinemedi (doi)",
+      );
+    }
   }
 
   // 2) Insert the document row as `processing` and capture its id.
