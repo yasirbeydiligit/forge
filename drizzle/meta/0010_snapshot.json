@@ -1,6 +1,6 @@
 {
-  "id": "44193eb6-26c3-4254-99ec-a0ce6837ecc2",
-  "prevId": "6ede61d3-42ab-4e62-9a56-18f61877442f",
+  "id": "3e34818f-3ea2-49ec-bf12-ffe6b6d184fe",
+  "prevId": "bc63b63d-3d6f-40e7-a5a6-43c36ca523d7",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -936,7 +936,23 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "insight_rules_pinned_chunk_idx": {
+          "name": "insight_rules_pinned_chunk_idx",
+          "columns": [
+            {
+              "expression": "pinned_chunk_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "insight_rules_pinned_chunk_id_document_chunks_id_fk": {
           "name": "insight_rules_pinned_chunk_id_document_chunks_id_fk",
@@ -1230,6 +1246,13 @@
           "nullsNotDistinct": false,
           "columns": [
             "content_hash"
+          ]
+        },
+        "library_documents_doi_key": {
+          "name": "library_documents_doi_key",
+          "nullsNotDistinct": false,
+          "columns": [
+            "doi"
           ]
         }
       },

@@ -32,6 +32,10 @@ const authUserId = (name: string) => uuid(name);
  * pgvector column type. drizzle-kit has no native `vector` type, so we declare a
  * customType whose dataType() emits the correct DDL (`vector(1024)`). The vector
  * extension itself, plus the HNSW / GIN indexes, live in a companion SQL migration.
+ *
+ * DDL-only: there is no toDriver/fromDriver because embeddings are written via the
+ * service-role Supabase client (not Drizzle ORM round-trips), so the column never
+ * needs JS<->driver value mapping — only its column type emitted into migrations.
  */
 const vector = customType<{ data: number[]; driverData: string }>({
   dataType() {
@@ -449,6 +453,9 @@ export const libraryDocuments = pgTable(
     pageCount: integer("page_count"),
     status: documentStatus("status").notNull().default("pending"),
     error: text("error"),
+    // Set only once ingestion reaches `ready`; pending rows leave it NULL, and
+    // Postgres treats NULLs as distinct, so the unique constraint never matches
+    // (dedup/upsert on content_hash won't collide with pending rows).
     contentHash: text("content_hash"),
     uploadedBy: uuid("uploaded_by").references(() => profiles.id, {
       onDelete: "set null",
@@ -459,6 +466,7 @@ export const libraryDocuments = pgTable(
   },
   (t) => [
     unique("library_documents_content_hash_key").on(t.contentHash),
+    unique("library_documents_doi_key").on(t.doi),
     index("library_documents_status_idx").on(t.status),
   ],
 );
@@ -536,7 +544,10 @@ export const insightRules = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [unique("insight_rules_key_key").on(t.key)],
+  (t) => [
+    unique("insight_rules_key_key").on(t.key),
+    index("insight_rules_pinned_chunk_idx").on(t.pinnedChunkId),
+  ],
 );
 
 void authUserId; // referenced for documentation of the auth.users linkage

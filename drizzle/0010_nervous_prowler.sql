@@ -1,0 +1,2 @@
+CREATE INDEX "insight_rules_pinned_chunk_idx" ON "insight_rules" USING btree ("pinned_chunk_id");--> statement-breakpoint
+ALTER TABLE "library_documents" ADD CONSTRAINT "library_documents_doi_key" UNIQUE("doi");
