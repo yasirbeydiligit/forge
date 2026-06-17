@@ -9,6 +9,7 @@ import {
   Dumbbell,
   Flame,
   LayoutDashboard,
+  Library,
   LineChart,
   type LucideIcon,
   MessageSquare,
@@ -47,6 +48,7 @@ function buildNav(profile: Profile, unansweredCount: number) {
     ];
     const secondary: NavItem[] = [
       { href: "/panel/egzersizler", label: "Egzersiz Kütüphanesi", icon: Flame },
+      { href: "/panel/kutuphane", label: "Kütüphane Yönetimi", icon: Library },
       { href: "/kutuphane", label: "Kütüphane", icon: BookOpen },
       { href: "/panel/davetler", label: "Davetler", icon: Send },
       {
