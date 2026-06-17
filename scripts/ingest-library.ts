@@ -28,7 +28,7 @@ import { config } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 
 import type { Database } from "../src/lib/database.types";
-import { ingestDocument, type IngestMeta } from "../src/lib/rag/ingest";
+import { ingestDocument, sha256Hex, type IngestMeta } from "../src/lib/rag/ingest";
 import { embedDocuments } from "../src/lib/rag/embed";
 import manifest from "./library-seed.json";
 
@@ -60,20 +60,16 @@ const USER_AGENT =
 
 const execFileAsync = promisify(execFile);
 
-// Voyage free-tier limits (no payment method): 3 requests/min and 10K
-// tokens/min. The Phase 1 `embedDocuments` batches up to 120K tokens/request
-// and won't pace itself, so it trips a hard 429 on the free tier. We wrap the
-// injected `embed` callback to (a) split chunk lists into small token-bounded
-// batches and (b) pace requests under both caps. This stays entirely in the
-// script — the Phase 1 core (`embed.ts`) is untouched.
-const VOYAGE_REQUESTS_PER_MIN = 3;
-// Stay safely under the 10K tokens/min cap with one batch per request.
-const EMBED_BATCH_TOKEN_BUDGET = 8_000;
-// One request every ~21s keeps us under 3 RPM with margin.
-const EMBED_REQUEST_INTERVAL_MS = Math.ceil(60_000 / VOYAGE_REQUESTS_PER_MIN) + 1_000;
+// Voyage's standard rate limits (unlocked once a payment method is added — the
+// 200M free tokens still apply) comfortably handle `embedDocuments`' internal
+// per-request batching, so we don't pace requests. We keep a 429-aware retry
+// only as a safety net: newly-added limits can take a few minutes to
+// propagate, during which a stray 429 is still possible. The Phase 1 core
+// (`embed.ts`) is untouched.
+const RATE_LIMIT_RETRIES = 3;
+const RATE_LIMIT_WAIT_MS = 60_000;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-const estimateTokens = (s: string) => Math.ceil(s.length / 4);
 
 type ManifestEntry = {
   title: string;
@@ -171,40 +167,29 @@ async function downloadPdf(entry: ManifestEntry): Promise<Uint8Array | null> {
 }
 
 /**
- * Rate-limited document embedder for the Voyage free tier. Splits `texts` into
- * batches whose estimated token total stays under {@link EMBED_BATCH_TOKEN_BUDGET},
- * delegates each batch to the Phase 1 `embedDocuments`, and paces requests to
- * respect the 3 RPM / 10K TPM free-tier caps. Returns one vector per input, in
- * order.
+ * Embed chunk texts via the Phase 1 `embedDocuments` (which batches internally
+ * up to Voyage's per-request cap). On a 429 (rate limit) — possible only during
+ * the brief window while a newly-added payment method's higher limits
+ * propagate — wait {@link RATE_LIMIT_WAIT_MS} and retry. Returns one vector per
+ * input, in order.
  */
-async function embedRateLimited(texts: string[]): Promise<number[][]> {
+async function embedWithRetry(texts: string[]): Promise<number[][]> {
   if (texts.length === 0) return [];
-
-  // Build token-bounded batches. A single oversized chunk still goes alone
-  // (Voyage will reject it only if it exceeds the per-minute cap, which our
-  // chunker's ~800-token ceiling keeps us well under).
-  const batches: string[][] = [];
-  let current: string[] = [];
-  let currentTokens = 0;
-  for (const text of texts) {
-    const tokens = estimateTokens(text);
-    if (current.length > 0 && currentTokens + tokens > EMBED_BATCH_TOKEN_BUDGET) {
-      batches.push(current);
-      current = [];
-      currentTokens = 0;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await embedDocuments(texts, VOYAGE_KEY);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("429") && attempt < RATE_LIMIT_RETRIES) {
+        console.warn(
+          `   ⏳ Voyage hız limiti (429) — ${RATE_LIMIT_WAIT_MS / 1000}s bekleyip tekrar deneniyor (${attempt + 1}/${RATE_LIMIT_RETRIES})`,
+        );
+        await sleep(RATE_LIMIT_WAIT_MS);
+        continue;
+      }
+      throw err;
     }
-    current.push(text);
-    currentTokens += tokens;
   }
-  if (current.length > 0) batches.push(current);
-
-  const out: number[][] = [];
-  for (let i = 0; i < batches.length; i++) {
-    if (i > 0) await sleep(EMBED_REQUEST_INTERVAL_MS);
-    const vectors = await embedDocuments(batches[i], VOYAGE_KEY);
-    out.push(...vectors);
-  }
-  return out;
 }
 
 /** Upload PDF bytes to the private `library` bucket; returns the storage path. */
@@ -239,6 +224,16 @@ async function ingestEntry(entry: ManifestEntry): Promise<Outcome> {
   if (!storagePath) return "skipped";
   console.log(`   ↑ depolandı: ${STORAGE_BUCKET}/${storagePath}`);
 
+  // Re-run safety: drop any prior non-ready (failed/processing) row for this
+  // exact file. ingestDocument only dedups against `ready` rows, so without
+  // this a previous failed attempt's row would collide on the content_hash
+  // UNIQUE constraint and block re-ingestion. Chunks cascade-delete via FK.
+  await admin
+    .from("library_documents")
+    .delete()
+    .eq("content_hash", sha256Hex(pdfBuffer))
+    .neq("status", "ready");
+
   const meta: IngestMeta = {
     title: entry.title,
     authors: entry.authors,
@@ -255,7 +250,7 @@ async function ingestEntry(entry: ManifestEntry): Promise<Outcome> {
       adminClient: admin as never,
       meta,
       pdfBuffer,
-      embed: embedRateLimited,
+      embed: embedWithRetry,
     });
     console.log(
       `   ✓ ${doc.status}${
