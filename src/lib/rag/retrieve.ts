@@ -51,10 +51,13 @@ type MatchChunkRow = {
  * in unit tests while staying compatible with the real client.
  */
 export type RetrieveClient = {
+  // The real `@supabase/ssr` client returns a thenable PostgrestFilterBuilder
+  // (not a plain Promise), so we accept any awaitable here. Mocks may return a
+  // Promise — both are assignable.
   rpc: (
     fn: "match_chunks",
     args: { query_embedding: string; query_text: string; match_count: number },
-  ) => Promise<{ data: MatchChunkRow[] | null; error: unknown }>;
+  ) => PromiseLike<{ data: MatchChunkRow[] | null; error: unknown }>;
 };
 
 export type SearchLibraryArgs = {
