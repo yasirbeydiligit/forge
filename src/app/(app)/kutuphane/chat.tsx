@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { BookOpen, Send } from "lucide-react";
+import { Send } from "lucide-react";
 import { toast } from "sonner";
 
 import { askLibrary } from "./actions";
@@ -20,6 +20,13 @@ export type ChatMessage = {
 };
 
 const MAX_QUOTE = 180;
+
+/** Starter prompts shown on the empty state; clicking fills the composer. */
+const SUGGESTIONS = [
+  "Haftalık antrenman hacmi ne kadar olmalı?",
+  "Günlük protein alımını nasıl planlamalıyım?",
+  "Toparlanmayı en çok ne etkiler?",
+];
 
 /** A unique key per citation target — de-dupes citations pointing at one chunk. */
 function citationKey(c: MappedCitation) {
@@ -55,6 +62,11 @@ export function LibraryChat({
   const [draft, setDraft] = useState("");
   const [isPending, startTransition] = useTransition();
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  function applySuggestion(question: string) {
+    setDraft(question);
+    document.getElementById("library-composer")?.focus();
+  }
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -108,12 +120,29 @@ export function LibraryChat({
   return (
     <div className="space-y-6">
       {isEmpty ? (
-        <PaperCard className="flex flex-col items-center gap-3 p-10 text-center">
-          <BookOpen className="size-6 text-paper-muted" />
-          <p className="max-w-sm font-serif text-lg italic text-paper-muted">
-            İlk sorunu sor — örneğin antrenman hacmi, protein alımı ya da
-            toparlanma üzerine. Yanıtlar kütüphanedeki kaynaklara dayanır.
-          </p>
+        <PaperCard className="flex flex-col items-center gap-5 p-10 text-center">
+          <LibraryEmptyArt />
+          <div className="space-y-1.5">
+            <h2 className="font-serif text-xl text-paper-foreground">
+              Kütüphaneye sor
+            </h2>
+            <p className="mx-auto max-w-sm font-serif text-[15px] italic text-paper-muted">
+              Yanıtlar yalnızca kütüphanedeki kaynaklara dayanır ve her zaman
+              alıntıyla gelir.
+            </p>
+          </div>
+          <div className="flex flex-wrap justify-center gap-2">
+            {SUGGESTIONS.map((q) => (
+              <button
+                key={q}
+                type="button"
+                onClick={() => applySuggestion(q)}
+                className="rounded-full border border-paper-border bg-paper px-3 py-1.5 text-sm text-paper-foreground transition-colors duration-[var(--dur-fast)] hover:border-lab-link/40 hover:text-lab-link"
+              >
+                {q}
+              </button>
+            ))}
+          </div>
         </PaperCard>
       ) : (
         <div className="space-y-5">
@@ -142,6 +171,7 @@ export function LibraryChat({
       <div className="sticky bottom-4 z-10">
         <PaperCard className="flex items-end gap-2 p-2">
           <Textarea
+            id="library-composer"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={onKeyDown}
@@ -162,6 +192,31 @@ export function LibraryChat({
           </Button>
         </PaperCard>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Editorial empty-state mark: three stacked "cited note" rows in the signature
+ * green / amber / blue stripe language. Placeholder for a future Higgsfield
+ * illustration — swap this component's body when the asset lands.
+ */
+function LibraryEmptyArt() {
+  const stripes = ["bg-lab-green", "bg-lab-amber", "bg-lab-blue"];
+  return (
+    <div className="flex w-full max-w-[208px] flex-col gap-1.5" aria-hidden>
+      {stripes.map((stripe, i) => (
+        <div
+          key={i}
+          className="flex items-center gap-2.5 rounded-md border border-paper-border bg-paper px-2.5 py-2 paper-shadow"
+        >
+          <span className={cn("h-7 w-[3px] shrink-0 rounded-full", stripe)} />
+          <span className="flex-1 space-y-1.5">
+            <span className="block h-1.5 w-3/4 rounded-full bg-paper-foreground/10" />
+            <span className="block h-1.5 w-1/2 rounded-full bg-paper-foreground/10" />
+          </span>
+        </div>
+      ))}
     </div>
   );
 }

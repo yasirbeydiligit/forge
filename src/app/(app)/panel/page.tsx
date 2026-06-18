@@ -103,7 +103,7 @@ export default async function CoachDashboardPage() {
           <div className="space-y-2">
             {questions.map((q) => (
               <Link key={q.id} href="/feed">
-                <PaperCard className="flex flex-col gap-1 p-4 transition-shadow hover:shadow-md">
+                <PaperCard className="flex flex-col gap-1 border-l-2 border-l-lab-amber p-4 transition-[transform,box-shadow] duration-[var(--dur-base)] ease-soft hover:-translate-y-0.5 hover:shadow-raised">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-sm font-semibold text-paper-foreground">
                       {q.author?.full_name ?? "Sporcu"}
@@ -145,9 +145,9 @@ function QuickLink({
   label: string;
 }) {
   return (
-    <Link href={href}>
-      <PaperCard className="flex flex-col items-center gap-2 p-4 text-center transition-shadow hover:shadow-md">
-        <span className="flex size-10 items-center justify-center rounded-xl bg-paper-foreground/[0.06] text-lab-green">
+    <Link href={href} className="group">
+      <PaperCard className="flex flex-col items-center gap-2 p-4 text-center transition-[transform,box-shadow] duration-[var(--dur-base)] ease-soft hover:-translate-y-0.5 hover:shadow-raised active:translate-y-0">
+        <span className="flex size-10 items-center justify-center rounded-xl bg-paper-foreground/[0.06] text-lab-green transition-colors duration-[var(--dur-base)] group-hover:bg-lab-green/10">
           <Icon className="size-5" />
         </span>
         <span className="text-sm font-medium text-paper-foreground">{label}</span>
