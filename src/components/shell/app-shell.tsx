@@ -164,11 +164,18 @@ export function AppShell({
               <Link
                 key={item.href}
                 href={item.href}
+                aria-current={active ? "page" : undefined}
                 className={cn(
-                  "relative flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors",
+                  "relative flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors duration-[var(--dur-fast)] ease-soft",
                   active ? "text-primary" : "text-muted-foreground",
                 )}
               >
+                {active ? (
+                  <span
+                    aria-hidden
+                    className="absolute inset-x-5 top-0 h-0.5 rounded-full bg-primary"
+                  />
+                ) : null}
                 <span className="relative">
                   <Icon className="size-5" />
                   {item.badge ? (
