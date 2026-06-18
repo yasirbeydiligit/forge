@@ -15,7 +15,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { MetricRow } from "./metric-row";
 import { LabHeader, LabPage, PaperCard, SectionLabel } from "@/components/lab/lab";
 import { InsightNotes } from "@/components/library/insight-note";
-import { Sparkline } from "@/components/logbook/sparkline";
+import { MeasureCard } from "@/components/measure-card";
 import { Button } from "@/components/ui/button";
 import { requireProfile } from "@/lib/auth";
 import { toDateKey, WEEKDAY_LABELS } from "@/lib/format";
@@ -144,37 +144,37 @@ export default async function TrackerPage({
       <section className="mt-8 space-y-3">
         <SectionLabel>Bu hafta</SectionLabel>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <AverageCard
+          <MeasureCard
             label="Ort. kilo"
             value={avgWeight != null ? avgWeight.toFixed(1) : "—"}
             unit="kg"
             points={valuesOf("weight")}
           />
-          <AverageCard
+          <MeasureCard
             label="Ort. uyku"
             value={avgSleep != null ? avgSleep.toFixed(1) : "—"}
             unit="s"
             points={valuesOf("sleep_hours")}
           />
-          <AverageCard
+          <MeasureCard
             label="Ort. RHR"
             value={avgHr != null ? String(Math.round(avgHr)) : "—"}
             unit="bpm"
             points={valuesOf("resting_hr")}
           />
-          <AverageCard
+          <MeasureCard
             label="Ort. enerji"
             value={avgEnergy != null ? avgEnergy.toFixed(1) : "—"}
             unit="/10"
             points={valuesOf("energy")}
           />
-          <AverageCard
+          <MeasureCard
             label="Ort. açlık"
             value={avgHunger != null ? avgHunger.toFixed(1) : "—"}
             unit="/10"
             points={valuesOf("hunger")}
           />
-          <AverageCard
+          <MeasureCard
             label="Ort. uyum"
             value={avgAdh != null ? avgAdh.toFixed(1) : "—"}
             unit="/10"
@@ -185,30 +185,5 @@ export default async function TrackerPage({
         <InsightNotes insights={insights} className="space-y-3" />
       </section>
     </LabPage>
-  );
-}
-
-function AverageCard({
-  label,
-  value,
-  unit,
-  points,
-}: {
-  label: string;
-  value: string;
-  unit: string;
-  points: number[];
-}) {
-  return (
-    <PaperCard className="p-4">
-      <SectionLabel className="text-paper-muted">{label}</SectionLabel>
-      <p className="mt-1 font-serif text-2xl tabular-nums text-paper-foreground">
-        {value}
-        <span className="ml-1 text-sm font-normal text-paper-muted">{unit}</span>
-      </p>
-      <div className="mt-2">
-        <Sparkline points={points} width={120} height={24} />
-      </div>
-    </PaperCard>
   );
 }
