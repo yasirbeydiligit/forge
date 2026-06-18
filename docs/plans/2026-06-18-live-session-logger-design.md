@@ -155,4 +155,38 @@ sets are the source of truth for *what was logged*; local state restores
 - sync queue: enqueue, flush order, reconcile serverId, drop unsynced delete.
 - storage: round-trip + version mismatch → ignore.
 
-**Manual E2E scenario:** see "Manual test scenario" below (filled at the end).
+**Manual E2E scenario:** see below.
+
+## Manual test scenario
+
+Prereq: logged in as an athlete with a workout assigned to a date `D` (e.g. via
+the coach calendar / seed). Open on a phone or a narrow viewport.
+
+1. **Enter** — go to `/antrenman/D`. Confirm the overview shows the workout card,
+   planned exercises with `0/N` set counts, and a **Antrenmanı başlat** button.
+2. **Start** — tap it → full-screen player opens on the **start** panel
+   (workout name, exercise list). Tap **Antrenmanı başlat**. The top-bar session
+   clock starts ticking; the first exercise is in focus.
+3. **Log a set** — the weight/reps fields show the planned target as
+   placeholders. Tap **Set tamamlandı** with no typing → a set is logged using
+   the target values, appears in the list, and the input resets to set 2.
+   Adjust with the ± steppers and log a second set.
+4. **PR** — log a set heavier than the exercise's all-time PR → the row gets a
+   green **PR** badge + a brief glow.
+5. **Rest** — tap the **Dinlen m:ss** chip → the compact ring counts down in the
+   footer. Confirm you can still log the next set while it runs; tap **+30** to
+   extend, **✕** to skip. At zero: gentle pulse + (if sound on) vibrate/chime.
+6. **Next exercise** — tap **Sonraki egzersiz** (or a pill in the rail) → focus
+   moves; "Egzersiz n/N" updates. Completed exercises show a check in the rail.
+7. **History** — expand **Geçmiş** on an exercise with history → est-1RM, PR,
+   4-week volume/RPE, last sessions and the trend sparkline.
+8. **Finish** — on the last exercise tap **Seansı bitir** (or **Bitir** in the
+   header) → summary shows total time, total volume, set count, a PR note (if
+   any) and a research note. Add a session note. Optionally **Feed'de paylaş**.
+   Tap **Bitir** → returns to the overview, now showing **Tamamlandı** + totals.
+9. **Resume after reload** — start a session, log 2 sets, then **reload the page
+   mid-session** (or lock/reopen). Confirm the player returns to the active
+   exercise with both sets intact and the clock continuing — no data lost.
+10. **Offline** — with DevTools set to Offline, log several sets: they appear
+    instantly and the header shows **çevrimdışı**. Go back Online → the queue
+    drains (spinner) and the sets persist (verify on the coach's athlete view).

@@ -193,14 +193,18 @@ export function useSessionPlayer(data: PlayerData) {
   const runFinish = useCallback(async () => {
     const payload = pendingFinish.current;
     if (!payload) return;
-    const res = await finishSessionAction({
-      date: data.date,
-      assignmentId: data.assignmentId,
-      workoutId: data.workoutId,
-      completed: payload.completed,
-      notes: payload.notes,
-    });
-    if (!("error" in res)) pendingFinish.current = null;
+    try {
+      const res = await finishSessionAction({
+        date: data.date,
+        assignmentId: data.assignmentId,
+        workoutId: data.workoutId,
+        completed: payload.completed,
+        notes: payload.notes,
+      });
+      if (!("error" in res)) pendingFinish.current = null;
+    } catch {
+      // Offline / transient: keep pendingFinish; the online effect retries.
+    }
   }, [data.date, data.assignmentId, data.workoutId]);
 
   useEffect(() => {
@@ -216,11 +220,14 @@ export function useSessionPlayer(data: PlayerData) {
       date: data.date,
       assignmentId: data.assignmentId,
       workoutId: data.workoutId,
-    }).then((res) => {
-      if (!("error" in res)) {
-        dispatch({ type: "START", sessionId: res.sessionId, startedAt });
-      }
-    });
+    })
+      .then((res) => {
+        if (!("error" in res)) {
+          dispatch({ type: "START", sessionId: res.sessionId, startedAt });
+        }
+      })
+      // Offline at start is fine: the first synced set creates the session.
+      .catch(() => {});
   }, [dispatch, data.date, data.assignmentId, data.workoutId]);
 
   const completeSet = useCallback(

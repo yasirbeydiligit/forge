@@ -275,11 +275,7 @@ function ActiveView({ data, player }: { data: PlayerData; player: Player }) {
             suggestedWeight={suggestedWeight}
             suggestedReps={suggestedReps}
             targetRpe={meta.target.rpe}
-            onComplete={(input) => {
-              const pr = player.completeSet(idx, input);
-              if (restSeconds && restSeconds > 0) player.startRest(idx, restSeconds);
-              return pr;
-            }}
+            onComplete={(input) => player.completeSet(idx, input)}
           />
 
           <div className="flex items-center gap-2 pb-3">
