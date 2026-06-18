@@ -379,6 +379,7 @@ export const dailyMetrics = pgTable(
     energy: integer("energy"),
     hunger: integer("hunger"),
     adherence: integer("adherence"),
+    waterMl: integer("water_ml"),
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -405,6 +406,7 @@ export const nutritionTargets = pgTable(
     protein: integer("protein"),
     carbs: integer("carbs"),
     fat: integer("fat"),
+    waterMl: integer("water_ml"),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

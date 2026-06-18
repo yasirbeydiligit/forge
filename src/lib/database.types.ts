@@ -85,6 +85,7 @@ export type Database = {
           notes: string | null
           resting_hr: number | null
           sleep_hours: number | null
+          water_ml: number | null
           weight: number | null
         }
         Insert: {
@@ -98,6 +99,7 @@ export type Database = {
           notes?: string | null
           resting_hr?: number | null
           sleep_hours?: number | null
+          water_ml?: number | null
           weight?: number | null
         }
         Update: {
@@ -111,6 +113,7 @@ export type Database = {
           notes?: string | null
           resting_hr?: number | null
           sleep_hours?: number | null
+          water_ml?: number | null
           weight?: number | null
         }
         Relationships: [
@@ -791,6 +794,7 @@ export type Database = {
           kcal: number | null
           protein: number | null
           updated_at: string
+          water_ml: number | null
         }
         Insert: {
           athlete_id: string
@@ -800,6 +804,7 @@ export type Database = {
           kcal?: number | null
           protein?: number | null
           updated_at?: string
+          water_ml?: number | null
         }
         Update: {
           athlete_id?: string
@@ -809,6 +814,7 @@ export type Database = {
           kcal?: number | null
           protein?: number | null
           updated_at?: string
+          water_ml?: number | null
         }
         Relationships: [
           {

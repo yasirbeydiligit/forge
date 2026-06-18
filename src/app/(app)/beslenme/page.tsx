@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, Trash2, UtensilsCrossed } from "lucide-react
 import { deleteMeal } from "./actions";
 import { MealDialog } from "./meal-dialog";
 import { TargetsDialog } from "./targets-dialog";
+import { WaterTracker } from "./water-tracker";
 import {
   LabHeader,
   LabPage,
@@ -42,23 +43,31 @@ export default async function NutritionPage({
   const nextKey = toDateKey(addDays(date, 1));
 
   const supabase = await createSupabaseServerClient();
-  const [{ data: targetData }, { data: mealsData }] = await Promise.all([
-    supabase
-      .from("nutrition_targets")
-      .select("*")
-      .eq("athlete_id", profile.id)
-      .maybeSingle(),
-    supabase
-      .from("meals")
-      .select("*")
-      .eq("athlete_id", profile.id)
-      .eq("meal_date", dateKey)
-      .order("eaten_at", { ascending: true, nullsFirst: false })
-      .order("created_at", { ascending: true }),
-  ]);
+  const [{ data: targetData }, { data: mealsData }, { data: metricData }] =
+    await Promise.all([
+      supabase
+        .from("nutrition_targets")
+        .select("*")
+        .eq("athlete_id", profile.id)
+        .maybeSingle(),
+      supabase
+        .from("meals")
+        .select("*")
+        .eq("athlete_id", profile.id)
+        .eq("meal_date", dateKey)
+        .order("eaten_at", { ascending: true, nullsFirst: false })
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("daily_metrics")
+        .select("water_ml")
+        .eq("athlete_id", profile.id)
+        .eq("metric_date", dateKey)
+        .maybeSingle(),
+    ]);
 
   const target = targetData as NutritionTarget | null;
   const meals = (mealsData ?? []) as Meal[];
+  const waterMl = metricData?.water_ml ?? 0;
 
   const insights = await getAthleteInsights(supabase, profile.id, "nutrition");
 
@@ -138,6 +147,14 @@ export default async function NutritionPage({
         </div>
       </PaperCard>
 
+      <div className="mt-4">
+        <WaterTracker
+          date={dateKey}
+          current={waterMl}
+          target={target?.water_ml ?? null}
+        />
+      </div>
+
       <InsightNotes insights={insights} className="mt-4 space-y-3" />
 
       <section className="mt-8 space-y-3">
@@ -161,10 +178,14 @@ export default async function NutritionPage({
                   {m.description ? (
                     <p className="text-sm text-paper-muted">{m.description}</p>
                   ) : null}
-                  <p className="mt-0.5 font-mono text-xs tabular-nums text-paper-muted">
-                    {(m.kcal ?? 0).toLocaleString("tr-TR")} kcal · {m.protein ?? 0}P
-                    · {m.carbs ?? 0}K · {m.fat ?? 0}Y
-                  </p>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    <span className="font-mono text-xs tabular-nums text-paper-muted">
+                      {(m.kcal ?? 0).toLocaleString("tr-TR")} kcal
+                    </span>
+                    <MacroBadge value={m.protein} suffix="P" accent="green" />
+                    <MacroBadge value={m.carbs} suffix="K" accent="amber" />
+                    <MacroBadge value={m.fat} suffix="Y" accent="violet" />
+                  </div>
                 </div>
                 <form action={deleteMeal} className="shrink-0">
                   <input type="hidden" name="id" value={m.id} />
@@ -182,5 +203,30 @@ export default async function NutritionPage({
         )}
       </section>
     </LabPage>
+  );
+}
+
+const MACRO_DOT = {
+  green: "bg-lab-green",
+  amber: "bg-lab-amber",
+  violet: "bg-lab-violet",
+} as const;
+
+/** Small consistent macro chip (e.g. 45P) colour-keyed to the macro bars. */
+function MacroBadge({
+  value,
+  suffix,
+  accent,
+}: {
+  value: number | null;
+  suffix: string;
+  accent: keyof typeof MACRO_DOT;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-paper-foreground/[0.04] px-2 py-0.5 font-mono text-[11px] tabular-nums text-paper-foreground">
+      <span className={`size-1.5 rounded-full ${MACRO_DOT[accent]}`} aria-hidden />
+      {value ?? 0}
+      {suffix}
+    </span>
   );
 }
