@@ -62,17 +62,7 @@ export async function askLibrary(
     resolvedThreadId = created.id;
   }
 
-  // 2) Persist the user message.
-  {
-    const { error } = await supabase.from("library_messages").insert({
-      thread_id: resolvedThreadId,
-      role: "user",
-      content: question,
-    });
-    if (error) throw new Error("Mesaj kaydedilemedi.");
-  }
-
-  // 3) Retrieve the top-k chunks for the question.
+  // 2) Retrieve the top-k chunks for the question.
   const chunks = await searchLibrary({
     supabase,
     embedQuery: (q) => embedQuery(q, ragEnv.voyageApiKey),
@@ -80,24 +70,33 @@ export async function askLibrary(
     k: 8,
   });
 
-  // 4) Ask Sonnet 4.6 with one citable document block per chunk (streaming).
+  // 3) Ask Sonnet 4.6 with one citable document block per chunk (streaming).
   const anthropic = new Anthropic({ apiKey: ragEnv.anthropicApiKey });
   const stream = anthropic.messages.stream(buildAnswerRequest(question, chunks));
   const message = await stream.finalMessage();
 
-  // 5) Parse the answer + citations and map citations back to source chunks.
+  // 4) Parse the answer + citations and map citations back to source chunks.
   const { answer, citations: citationObjects } = parseAnswer(message.content);
   const citations = mapCitations(citationObjects, chunks);
 
-  // 6) Persist the assistant message with the mapped citations as jsonb.
+  // 5) Persist the turn only AFTER a successful answer, so a failed generation
+  //    (Voyage / Anthropic / RPC error) never leaves an orphaned, answer-less
+  //    question in the thread history. User row first to preserve ordering.
   {
-    const { error } = await supabase.from("library_messages").insert({
+    const { error: userErr } = await supabase.from("library_messages").insert({
+      thread_id: resolvedThreadId,
+      role: "user",
+      content: question,
+    });
+    if (userErr) throw new Error("Mesaj kaydedilemedi.");
+
+    const { error: asstErr } = await supabase.from("library_messages").insert({
       thread_id: resolvedThreadId,
       role: "assistant",
       content: answer,
       citations: citations as unknown as Json,
     });
-    if (error) throw new Error("Yanıt kaydedilemedi.");
+    if (asstErr) throw new Error("Yanıt kaydedilemedi.");
   }
 
   return { threadId: resolvedThreadId, answer, citations };
