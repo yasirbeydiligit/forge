@@ -5,55 +5,10 @@ import { z } from "zod";
 
 import { requireProfile } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-
-type SupabaseServer = Awaited<ReturnType<typeof createSupabaseServerClient>>;
+import { ensureSession } from "./session-helpers";
 
 const optionalNum = (v: FormDataEntryValue | null) =>
   v === "" || v == null ? null : Number(v);
-
-/** Find or create the athlete's log session for a given assignment + date. */
-async function ensureSession(
-  supabase: SupabaseServer,
-  args: {
-    athleteId: string;
-    assignmentId: string | null;
-    workoutId: string | null;
-    date: string;
-  },
-): Promise<string | null> {
-  const { athleteId, assignmentId, workoutId, date } = args;
-
-  if (assignmentId) {
-    const { data: existing } = await supabase
-      .from("log_sessions")
-      .select("id")
-      .eq("athlete_id", athleteId)
-      .eq("assignment_id", assignmentId)
-      .maybeSingle();
-    if (existing) return existing.id;
-  } else {
-    const { data: existing } = await supabase
-      .from("log_sessions")
-      .select("id")
-      .eq("athlete_id", athleteId)
-      .eq("session_date", date)
-      .is("assignment_id", null)
-      .maybeSingle();
-    if (existing) return existing.id;
-  }
-
-  const { data: created } = await supabase
-    .from("log_sessions")
-    .insert({
-      athlete_id: athleteId,
-      assignment_id: assignmentId,
-      workout_id: workoutId,
-      session_date: date,
-    })
-    .select("id")
-    .single();
-  return created?.id ?? null;
-}
 
 const logSetSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
