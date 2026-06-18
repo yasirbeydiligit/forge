@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 
 import { Brand } from "@/components/brand";
+import { PaperGrain } from "@/components/paper-grain";
 import { UserMenu } from "@/components/shell/user-menu";
 import { Badge } from "@/components/ui/badge";
 import type { Profile } from "@/lib/auth";
@@ -105,6 +106,7 @@ export function AppShell({
 
   return (
     <div className="min-h-dvh md:grid md:grid-cols-[16rem_1fr]">
+      <PaperGrain />
       {/* Desktop sidebar */}
       <aside className="sticky top-0 hidden h-dvh flex-col border-r border-border bg-sidebar/60 p-4 md:flex">
         <div className="px-2 py-3">

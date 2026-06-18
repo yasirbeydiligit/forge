@@ -1,26 +1,283 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  /* "Lab notebook" additive palette (used by the src/components/lab primitives). */
+  --color-lab-bg: var(--lab-bg);
+  --color-paper: var(--paper);
+  --color-paper-foreground: var(--paper-foreground);
+  --color-paper-muted: var(--paper-muted);
+  --color-paper-border: var(--paper-border);
+  --color-lab-green: var(--lab-green);
+  --color-lab-amber: var(--lab-amber);
+  --color-lab-violet: var(--lab-violet);
+  --color-lab-link: var(--lab-link);
+  --color-lab-ink: var(--lab-ink);
+  --color-lab-blue: var(--lab-blue);
+  /* Mid surface between the cream page and the white card (inset fills,
+   * progress tracks, empty calendar cells). */
+  --color-surface: var(--surface);
+  /* Semantic research-domain accents (signature colored stripe): a single
+   * source of truth mapping a knowledge domain to its colour. */
+  --color-accent-nutrition: var(--accent-nutrition);
+  --color-accent-recovery: var(--accent-recovery);
+  --color-accent-training: var(--accent-training);
+  /* Motion easing tokens (durations live as raw custom props in :root). */
+  --ease-soft: var(--ease-out);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-serif: var(--font-newsreader), ui-serif, Georgia, "Times New Roman", serif;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/*
+ * Light, paper-forward editorial palette. Warm cream canvas, white cards with
+ * hairline borders + soft shadows, dark ink text, a single refined deep-green
+ * accent, calm blue links. Applied app-wide via tokens; the cream/white "paper"
+ * tokens (used by the src/components/lab primitives) mirror the card surface.
+ * Both :root and .dark hold the light palette so the app is light regardless.
+ */
+:root {
+  --radius: 0.75rem;
+
+  --background: oklch(0.965 0.008 85);
+  --foreground: oklch(0.26 0.012 60);
+  --card: oklch(0.995 0.003 85);
+  --card-foreground: oklch(0.26 0.012 60);
+  --popover: oklch(0.995 0.003 85);
+  --popover-foreground: oklch(0.26 0.012 60);
+  --primary: oklch(0.52 0.11 152);
+  --primary-foreground: oklch(0.99 0.012 150);
+  --secondary: oklch(0.92 0.006 85);
+  --secondary-foreground: oklch(0.3 0.012 60);
+  --muted: oklch(0.945 0.006 85);
+  --muted-foreground: oklch(0.52 0.012 70);
+  --accent: oklch(0.92 0.008 85);
+  --accent-foreground: oklch(0.28 0.012 60);
+  --destructive: oklch(0.55 0.2 25);
+  --destructive-foreground: oklch(0.99 0.01 25);
+  --border: oklch(0.89 0.01 85);
+  --input: oklch(0.84 0.012 85);
+  --ring: oklch(0.52 0.11 152);
+  --chart-1: oklch(0.52 0.11 152);
+  --chart-2: oklch(0.55 0.1 200);
+  --chart-3: oklch(0.5 0.13 262);
+  --chart-4: oklch(0.62 0.12 65);
+  --chart-5: oklch(0.55 0.18 25);
+  --sidebar: oklch(0.95 0.008 85);
+  --sidebar-foreground: oklch(0.26 0.012 60);
+  --sidebar-primary: oklch(0.52 0.11 152);
+  --sidebar-primary-foreground: oklch(0.99 0.012 150);
+  --sidebar-accent: oklch(0.92 0.008 85);
+  --sidebar-accent-foreground: oklch(0.28 0.012 60);
+  --sidebar-border: oklch(0.89 0.01 85);
+  --sidebar-ring: oklch(0.52 0.11 152);
+
+  /* "Paper" surfaces mirror the white card on the warm cream canvas. */
+  --lab-bg: oklch(0.965 0.008 85);
+  --lab-ink: oklch(0.24 0.012 60);
+  --paper: oklch(0.995 0.003 85);
+  --paper-foreground: oklch(0.26 0.012 60);
+  --paper-muted: oklch(0.52 0.012 70);
+  --paper-border: oklch(0.89 0.01 85);
+  --lab-green: oklch(0.5 0.1 155);
+  --lab-amber: oklch(0.58 0.12 65);
+  --lab-violet: oklch(0.5 0.11 290);
+  --lab-link: oklch(0.5 0.13 250);
+  /* Calm editorial blue for the "training" research domain (brief: mavi =
+   * antrenman). Distinct from the lab-link blue used for inline links. */
+  --lab-blue: oklch(0.5 0.12 245);
+
+  /* Mid surface (one notch above the cream page, below the white card). */
+  --surface: oklch(0.985 0.005 85);
+
+  /* Domain → colour aliases. Used by the signature stripe everywhere so the
+   * mapping is changed in exactly one place. */
+  --accent-nutrition: var(--lab-green);
+  --accent-recovery: var(--lab-amber);
+  --accent-training: var(--lab-blue);
+
+  /* Motion: shared easing + duration scale. Every transition references these
+   * so timing stays consistent and tunable from one place. */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-fast: 120ms;
+  --dur-base: 220ms;
+  --dur-slow: 360ms;
+
+  /* Paper grain texture. Default is a tiny inline fractal-noise SVG; swap to a
+   * real asset later via:  --grain-image: url("/textures/grain.png"); */
+  --grain-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.dark {
+  --background: oklch(0.965 0.008 85);
+  --foreground: oklch(0.26 0.012 60);
+  --card: oklch(0.995 0.003 85);
+  --card-foreground: oklch(0.26 0.012 60);
+  --popover: oklch(0.995 0.003 85);
+  --popover-foreground: oklch(0.26 0.012 60);
+  --primary: oklch(0.52 0.11 152);
+  --primary-foreground: oklch(0.99 0.012 150);
+  --secondary: oklch(0.92 0.006 85);
+  --secondary-foreground: oklch(0.3 0.012 60);
+  --muted: oklch(0.945 0.006 85);
+  --muted-foreground: oklch(0.52 0.012 70);
+  --accent: oklch(0.92 0.008 85);
+  --accent-foreground: oklch(0.28 0.012 60);
+  --destructive: oklch(0.55 0.2 25);
+  --destructive-foreground: oklch(0.99 0.01 25);
+  --border: oklch(0.89 0.01 85);
+  --input: oklch(0.84 0.012 85);
+  --ring: oklch(0.52 0.11 152);
+  --chart-1: oklch(0.52 0.11 152);
+  --chart-2: oklch(0.55 0.1 200);
+  --chart-3: oklch(0.5 0.13 262);
+  --chart-4: oklch(0.62 0.12 65);
+  --chart-5: oklch(0.55 0.18 25);
+  --sidebar: oklch(0.95 0.008 85);
+  --sidebar-foreground: oklch(0.26 0.012 60);
+  --sidebar-primary: oklch(0.52 0.11 152);
+  --sidebar-primary-foreground: oklch(0.99 0.012 150);
+  --sidebar-accent: oklch(0.92 0.008 85);
+  --sidebar-accent-foreground: oklch(0.28 0.012 60);
+  --sidebar-border: oklch(0.89 0.01 85);
+  --sidebar-ring: oklch(0.52 0.11 152);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* Accessibility: honour reduced-motion globally. Any transition/animation
+   * collapses to a near-instant change regardless of component-level classes. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@utility pb-safe {
+  padding-bottom: max(env(safe-area-inset-bottom), 0px);
+}
+@utility pt-safe {
+  padding-top: max(env(safe-area-inset-top), 0px);
+}
+
+/* Soft elevation for white cards on the cream canvas. */
+@utility paper-shadow {
+  box-shadow:
+    0 1px 2px oklch(0 0 0 / 5%),
+    0 8px 24px oklch(0 0 0 / 4%);
+}
+
+/* One notch higher — hover / raised state. Still soft and low. */
+@utility shadow-raised {
+  box-shadow:
+    0 2px 4px oklch(0 0 0 / 6%),
+    0 14px 34px oklch(0 0 0 / 7%);
+}
+
+/* Paper grain: tiled, swappable texture (see --grain-image). Apply to a
+ * pointer-events-none fixed overlay; opacity is set by the caller. */
+@utility paper-grain {
+  background-image: var(--grain-image);
+  background-size: 140px 140px;
+  background-repeat: repeat;
+}
+
+/* ------------------------------------------------------------------ */
+/* Typography scale — single source for the editorial type ramp.       */
+/* Serif (Newsreader) for display/headings; mono labels are tracked.   */
+/* Colour is intentionally left to the caller.                         */
+/* ------------------------------------------------------------------ */
+@utility text-display {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  font-size: clamp(2rem, 1.4rem + 2.2vw, 2.75rem);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+@utility text-h1 {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  font-size: 1.875rem;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+}
+@utility text-h2 {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  font-size: 1.25rem;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+@utility text-label {
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+}
+@utility text-caption {
+  font-size: 0.75rem;
+  line-height: 1.1rem;
 }

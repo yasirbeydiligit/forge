@@ -25,13 +25,13 @@ import type { AthleteInsight } from "@/lib/rag/insights-server";
 
 /**
  * Map an insight's scope to a margin-note accent so the inline notes pick up the
- * same colour language as the surrounding data (nutrition/protein → green,
- * training → violet, recovery → amber). Unknown/empty scopes fall back to green.
+ * same colour language as the surrounding data (nutrition → green,
+ * training → blue, recovery → amber). Unknown/empty scopes fall back to green.
  */
-function accentForScope(scope: string | null): "green" | "amber" | "violet" {
+function accentForScope(scope: string | null): "green" | "amber" | "blue" {
   switch (scope) {
     case "training":
-      return "violet";
+      return "blue";
     case "recovery":
       return "amber";
     case "nutrition":
