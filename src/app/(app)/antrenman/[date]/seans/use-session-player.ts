@@ -1,0 +1,359 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+
+import {
+  createInitialState,
+  hydrate,
+  sessionReducer,
+  type InitInput,
+  type SessionAction,
+} from "@/lib/session/reducer";
+import {
+  loadQueue,
+  loadState,
+  queueKey,
+  saveQueue,
+  saveState,
+  sessionKey,
+} from "@/lib/session/storage";
+import { detectPr } from "@/lib/session/totals";
+import { queueReducer, type QueueEvent, type QueueOp } from "@/lib/session/sync-queue";
+import type { SessionState } from "@/lib/session/types";
+
+import {
+  deleteSetAction,
+  finishSessionAction,
+  logSetAction,
+  startSessionAction,
+} from "./actions";
+import type { PlayerData } from "./player-data";
+
+const SETTINGS_KEY = "forge:session:settings:v1";
+
+export type SetInput = {
+  weight: number | null;
+  reps: number | null;
+  rpe: number | null;
+  note: string | null;
+};
+
+function buildInit(data: PlayerData): InitInput {
+  return {
+    date: data.date,
+    assignmentId: data.assignmentId,
+    workoutId: data.workoutId,
+    sessionId: null,
+    startedAt: data.startedAtMs,
+    exercises: data.exercises.map((e) => ({
+      workoutExerciseId: e.workoutExerciseId,
+      exerciseId: e.exerciseId,
+      serverSets: e.serverSets,
+    })),
+  };
+}
+
+function delay(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+/** A soft chime when a rest timer ends, lazily using the Web Audio API. */
+function playChime() {
+  try {
+    const Ctx =
+      window.AudioContext ??
+      (window as unknown as { webkitAudioContext?: typeof AudioContext })
+        .webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = 660;
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.4);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.42);
+    osc.onended = () => ctx.close();
+  } catch {
+    // Audio is best-effort; ignore unsupported / blocked contexts.
+  }
+}
+
+export function useSessionPlayer(data: PlayerData) {
+  const sKey = sessionKey(data.date, data.assignmentId);
+  const qKey = queueKey(data.date, data.assignmentId);
+
+  const [state, setState] = useState<SessionState>(() => createInitialState(buildInit(data)));
+  const [queue, setQueue] = useState<QueueOp[]>([]);
+  const [online, setOnline] = useState(true);
+  const [hydrated, setHydrated] = useState(false);
+  const [soundHaptics, setSoundHaptics] = useState(true);
+
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  const flushing = useRef(false);
+  const [retryTick, setRetryTick] = useState(0);
+
+  const dispatch = useCallback((action: SessionAction) => {
+    setState((s) => sessionReducer(s, action));
+  }, []);
+
+  const enqueue = useCallback(
+    (event: QueueEvent) => {
+      setQueue((q) => queueReducer(q, event));
+    },
+    [],
+  );
+
+  // ---- One-time hydration from localStorage (client only) ----
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const persisted = loadState(window.localStorage, sKey);
+    setState((server) => hydrate({ server, persisted }));
+    setQueue(loadQueue(window.localStorage, qKey));
+    setOnline(navigator.onLine);
+    try {
+      const raw = window.localStorage.getItem(SETTINGS_KEY);
+      if (raw) setSoundHaptics(JSON.parse(raw)?.soundHaptics !== false);
+    } catch {
+      /* keep default */
+    }
+    setHydrated(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ---- Persist on change (after hydration so we never clobber stored state) ----
+  useEffect(() => {
+    if (!hydrated || typeof window === "undefined") return;
+    saveState(window.localStorage, sKey, state);
+  }, [state, hydrated, sKey]);
+
+  useEffect(() => {
+    if (!hydrated || typeof window === "undefined") return;
+    saveQueue(window.localStorage, qKey, queue);
+  }, [queue, hydrated, qKey]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ soundHaptics }));
+    } catch {
+      /* ignore */
+    }
+  }, [soundHaptics]);
+
+  // ---- Online / offline ----
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const on = () => setOnline(true);
+    const off = () => setOnline(false);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
+    return () => {
+      window.removeEventListener("online", on);
+      window.removeEventListener("offline", off);
+    };
+  }, []);
+
+  // ---- Sync flusher: process the head op whenever online + non-empty ----
+  useEffect(() => {
+    if (!hydrated || !online || queue.length === 0 || flushing.current) return;
+    const op = queue[0];
+    flushing.current = true;
+    void (async () => {
+      try {
+        if (op.kind === "logSet") {
+          const res = await logSetAction(op.payload);
+          if ("error" in res) {
+            await delay(1500);
+          } else {
+            dispatch({ type: "RECONCILE_SET", localId: op.localId, serverId: res.id });
+            // Remove by id (a concurrent DELETE may already have dropped it).
+            setQueue((q) => queueReducer(q, { type: "SYNCED", localId: op.localId }));
+          }
+        } else {
+          const res = await deleteSetAction({ id: op.serverId, date: data.date });
+          if ("error" in res) await delay(1500);
+          else setQueue((q) => q.filter((o) => o !== op));
+        }
+      } catch {
+        await delay(1500);
+      } finally {
+        flushing.current = false;
+        setRetryTick((t) => t + 1); // re-trigger if the queue didn't change
+      }
+    })();
+  }, [queue, online, hydrated, retryTick, dispatch, data.date]);
+
+  // ---- Pending finish retry (finishing offline) ----
+  const pendingFinish = useRef<{ completed: boolean; notes: string | null } | null>(null);
+  const runFinish = useCallback(async () => {
+    const payload = pendingFinish.current;
+    if (!payload) return;
+    const res = await finishSessionAction({
+      date: data.date,
+      assignmentId: data.assignmentId,
+      workoutId: data.workoutId,
+      completed: payload.completed,
+      notes: payload.notes,
+    });
+    if (!("error" in res)) pendingFinish.current = null;
+  }, [data.date, data.assignmentId, data.workoutId]);
+
+  useEffect(() => {
+    if (online && pendingFinish.current) void runFinish();
+  }, [online, retryTick, runFinish]);
+
+  // ---- Public actions ----
+  const start = useCallback(() => {
+    if (stateRef.current.startedAt != null) return;
+    const startedAt = Date.now();
+    dispatch({ type: "START", sessionId: stateRef.current.sessionId ?? "pending", startedAt });
+    void startSessionAction({
+      date: data.date,
+      assignmentId: data.assignmentId,
+      workoutId: data.workoutId,
+    }).then((res) => {
+      if (!("error" in res)) {
+        dispatch({ type: "START", sessionId: res.sessionId, startedAt });
+      }
+    });
+  }, [dispatch, data.date, data.assignmentId, data.workoutId]);
+
+  const completeSet = useCallback(
+    (exerciseIndex: number, input: SetInput): boolean => {
+      const ex = stateRef.current.exercises[exerciseIndex];
+      const meta = data.exercises[exerciseIndex];
+      if (!ex || !meta) return false;
+      const pr = detectPr(meta.stats, { weight: input.weight, reps: input.reps });
+      const localId =
+        typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `l-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+      dispatch({
+        type: "COMPLETE_SET",
+        exerciseIndex,
+        set: {
+          localId,
+          serverId: null,
+          weight: input.weight,
+          reps: input.reps,
+          rpe: input.rpe,
+          note: input.note,
+          completedAt: Date.now(),
+          pr,
+        },
+      });
+      enqueue({
+        type: "LOG",
+        localId,
+        payload: {
+          date: data.date,
+          assignmentId: data.assignmentId,
+          workoutId: data.workoutId,
+          exerciseId: ex.exerciseId,
+          workoutExerciseId: ex.workoutExerciseId,
+          setNumber: ex.sets.length + 1,
+          weight: input.weight,
+          reps: input.reps,
+          rpe: input.rpe,
+          note: input.note,
+        },
+      });
+      return pr;
+    },
+    [dispatch, enqueue, data],
+  );
+
+  const deleteSet = useCallback(
+    (localId: string) => {
+      let serverId: string | null = null;
+      for (const ex of stateRef.current.exercises) {
+        const found = ex.sets.find((s) => s.localId === localId);
+        if (found) {
+          serverId = found.serverId;
+          break;
+        }
+      }
+      dispatch({ type: "DELETE_SET", localId });
+      enqueue({ type: "DELETE", localId, serverId });
+    },
+    [dispatch, enqueue],
+  );
+
+  const setActiveExercise = useCallback(
+    (index: number) => dispatch({ type: "SET_ACTIVE_EXERCISE", index }),
+    [dispatch],
+  );
+
+  const startRest = useCallback(
+    (exerciseIndex: number, seconds: number) =>
+      dispatch({ type: "START_REST", exerciseIndex, endsAt: Date.now() + seconds * 1000 }),
+    [dispatch],
+  );
+
+  const extendRest = useCallback(
+    (seconds: number) => {
+      const rest = stateRef.current.rest;
+      if (!rest) return;
+      dispatch({
+        type: "START_REST",
+        exerciseIndex: rest.exerciseIndex,
+        endsAt: rest.endsAt + seconds * 1000,
+      });
+    },
+    [dispatch],
+  );
+
+  const clearRest = useCallback(() => dispatch({ type: "CLEAR_REST" }), [dispatch]);
+
+  const notifyRestDone = useCallback(() => {
+    if (!soundHaptics) return;
+    if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(180);
+    playChime();
+  }, [soundHaptics]);
+
+  // Show the summary without committing yet (so "geri dön" is free).
+  const goToSummary = useCallback(() => {
+    dispatch({ type: "FINISH", finishedAt: Date.now() });
+  }, [dispatch]);
+
+  // Commit completion to the server (with offline retry) — called from summary.
+  const finish = useCallback(
+    (notes: string | null) => {
+      dispatch({ type: "FINISH", finishedAt: stateRef.current.finishedAt ?? Date.now() });
+      pendingFinish.current = { completed: true, notes };
+      void runFinish();
+    },
+    [dispatch, runFinish],
+  );
+
+  const reopen = useCallback(() => {
+    dispatch({ type: "REOPEN" });
+  }, [dispatch]);
+
+  return {
+    state,
+    online,
+    hydrated,
+    isSyncing: queue.length > 0,
+    pendingCount: queue.length,
+    soundHaptics,
+    setSoundHaptics,
+    start,
+    completeSet,
+    deleteSet,
+    setActiveExercise,
+    startRest,
+    extendRest,
+    clearRest,
+    notifyRestDone,
+    goToSummary,
+    finish,
+    reopen,
+  };
+}

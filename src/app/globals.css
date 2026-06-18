@@ -281,3 +281,37 @@
   font-size: 0.75rem;
   line-height: 1.1rem;
 }
+
+/* ------------------------------------------------------------------ */
+/* Live session logger micro-interactions. Brief, calm, Forge-flavored. */
+/* Durations reference the motion tokens; reduced-motion zeroes them.   */
+/* ------------------------------------------------------------------ */
+
+/* A logged set that beat a prior best: a soft green wash that fades out. */
+@keyframes forge-pr-glow {
+  0% {
+    background-color: color-mix(in oklch, var(--lab-green) 20%, transparent);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+@utility forge-pr-glow {
+  animation: forge-pr-glow var(--dur-slow) var(--ease-out);
+}
+
+/* Rest timer reaching zero: one gentle pulse of the ring. */
+@keyframes forge-rest-done {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@utility forge-rest-done {
+  animation: forge-rest-done var(--dur-slow) var(--ease-out);
+}

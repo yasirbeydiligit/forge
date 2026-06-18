@@ -151,3 +151,20 @@ export async function finishSessionAction(
   revalidatePath(`/antrenman/${d.date}`);
   return { ok: true };
 }
+
+export async function shareToFeedAction(
+  raw: { body: string },
+): Promise<{ ok: true } | { error: string }> {
+  const profile = await requireProfile();
+  const body = z.string().trim().min(1).max(2000).safeParse(raw.body);
+  if (!body.success) return { error: "invalid" };
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase
+    .from("feed_posts")
+    .insert({ author_id: profile.id, body: body.data, is_question: false });
+  if (error) return { error: "share_failed" };
+
+  revalidatePath("/feed");
+  return { ok: true };
+}
