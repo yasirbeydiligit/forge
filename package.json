@@ -15,6 +15,7 @@
     "db:push": "drizzle-kit push",
     "seed": "tsx src/db/seed.ts",
     "seed:insight-rules": "tsx scripts/seed-insight-rules.ts",
+    "seed:demo-athlete": "tsx scripts/seed-demo-athlete.ts",
     "ingest:library": "tsx scripts/ingest-library.ts"
   },
   "dependencies": {
