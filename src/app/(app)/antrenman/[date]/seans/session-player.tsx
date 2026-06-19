@@ -49,15 +49,18 @@ function fmtElapsed(ms: number) {
   return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 }
 
-/** Live session clock; ticks only once the session has started. */
-function useElapsed(startedAt: number | null) {
+/** Live session clock; ticks while running, freezes once the session is
+ * finished (so "Seansı bitir" stops the timer immediately). */
+function useElapsed(startedAt: number | null, stoppedAt: number | null) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    if (startedAt == null) return;
+    if (startedAt == null || stoppedAt != null) return;
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
-  }, [startedAt]);
-  return startedAt == null ? 0 : now - startedAt;
+  }, [startedAt, stoppedAt]);
+  if (startedAt == null) return 0;
+  if (stoppedAt != null) return stoppedAt - startedAt;
+  return now - startedAt;
 }
 
 function plannedLine(target: PlayerData["exercises"][number]["target"], category: string | null) {
@@ -85,7 +88,7 @@ export function SessionPlayer({ data }: { data: PlayerData }) {
 
   const started = state.startedAt != null;
   const finished = state.finishedAt != null;
-  const elapsedMs = useElapsed(state.startedAt);
+  const elapsedMs = useElapsed(state.startedAt, state.finishedAt);
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background">
