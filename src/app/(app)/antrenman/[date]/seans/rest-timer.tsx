@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Plus, X } from "lucide-react";
+import { Minus, Plus, X } from "lucide-react";
 
 function fmt(ms: number) {
   const total = Math.max(0, Math.ceil(ms / 1000));
@@ -83,15 +83,27 @@ export function RestTimer({
         </p>
       </div>
 
-      <button
-        type="button"
-        onClick={() => onExtend(30)}
-        aria-label="30 saniye ekle"
-        className="inline-flex h-9 items-center gap-1 rounded-full border border-border px-2.5 font-mono text-xs text-muted-foreground transition-colors duration-[var(--dur-fast)] ease-soft active:bg-muted"
-      >
-        <Plus className="size-3.5" />
-        30
-      </button>
+      <div className="flex items-center overflow-hidden rounded-full border border-border">
+        <button
+          type="button"
+          onClick={() => onExtend(-30)}
+          aria-label="30 saniye azalt"
+          className="inline-flex h-9 items-center gap-0.5 px-2.5 font-mono text-xs text-muted-foreground transition-colors duration-[var(--dur-fast)] ease-soft active:bg-muted"
+        >
+          <Minus className="size-3.5" />
+          30
+        </button>
+        <span className="h-5 w-px bg-border" aria-hidden />
+        <button
+          type="button"
+          onClick={() => onExtend(30)}
+          aria-label="30 saniye ekle"
+          className="inline-flex h-9 items-center gap-0.5 px-2.5 font-mono text-xs text-muted-foreground transition-colors duration-[var(--dur-fast)] ease-soft active:bg-muted"
+        >
+          <Plus className="size-3.5" />
+          30
+        </button>
+      </div>
       <button
         type="button"
         onClick={onSkip}

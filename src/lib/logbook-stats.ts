@@ -35,6 +35,9 @@ export type ExerciseStats = {
   trendPoints: number[];
   /** Previous session's set weights, ordered by set number (for VS LAST). */
   prevSessionWeights: number[];
+  /** Previous session's sets (weight + reps), ordered by set number. Powers
+   * last-entered placeholders and the session summary's set-by-set comparison. */
+  prevSessionSets: { weight: number; reps: number | null }[];
 };
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -155,12 +158,16 @@ export function computeExerciseStats(
   // Previous session (strictly before today) → set weights ordered by set number.
   const prevDate = sessionDates.find((d) => d.localeCompare(todayDate) < 0);
   const prevSessionWeights: number[] = [];
+  const prevSessionSets: { weight: number; reps: number | null }[] = [];
   if (prevDate) {
     const prevSets = bySession
       .get(prevDate)!
       .filter((s) => s.weight != null)
       .sort((a, b) => a.set_number - b.set_number);
-    for (const s of prevSets) prevSessionWeights.push(Number(s.weight));
+    for (const s of prevSets) {
+      prevSessionWeights.push(Number(s.weight));
+      prevSessionSets.push({ weight: Number(s.weight), reps: s.reps });
+    }
   }
 
   return {
@@ -173,5 +180,6 @@ export function computeExerciseStats(
     trendDelta,
     trendPoints,
     prevSessionWeights,
+    prevSessionSets,
   };
 }

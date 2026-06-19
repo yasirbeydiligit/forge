@@ -190,3 +190,28 @@ the coach calendar / seed). Open on a phone or a narrow viewport.
 10. **Offline** — with DevTools set to Offline, log several sets: they appear
     instantly and the header shows **çevrimdışı**. Go back Online → the queue
     drains (spinner) and the sets persist (verify on the coach's athlete view).
+
+## UX iteration (2026-06-19)
+
+After dogfooding the first version, the following refinements landed:
+
+- **Overview:** workout/day name is now a bold serif heading; exercise names are
+  bold; rows breathe more; the completed card shows session **duration**.
+- **Start panel removed.** It duplicated the overview list. The overview's
+  "Antrenmanı başlat" now opens the player directly: the first exercise + history
+  are visible, and a single in-context **Antrenmanı başlat** starts the clock and
+  reveals the set inputs (one fewer screen + tap).
+- **Hero session clock** in the header (large mono, with a "Süre" label).
+- **Auto-rest:** completing a set now auto-starts the rest countdown (reversing
+  the earlier manual-only choice — the athlete asked for it). The rest bar gained
+  a **−30** control alongside **+30**.
+- **Exercise navigation:** ‹ / › arrows in the exercise header + a footer
+  **Önceki** button; the forward action is **Hareketi bitir** (advances and
+  ensures the rest timer is running), which becomes **Seansı bitir** on the last
+  exercise.
+- **Smarter suggestions:** placeholder weight/reps follow the *last set entered
+  this session*, then the *previous session's last set*, then the program target.
+  (`computeExerciseStats` now returns `prevSessionSets`.)
+- **Richer summary:** hero metrics gained a volume **Δ vs last session** and a
+  total-reps line; a per-exercise breakdown lists every set as a chip with its
+  Δ-vs-last and PR marker.

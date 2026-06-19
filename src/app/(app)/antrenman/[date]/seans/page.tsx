@@ -126,6 +126,7 @@ export default async function SessionPlayerPage({
         allTimePr: stats.allTimePr,
         allTimePrDate: stats.allTimePrDate,
         prevSessionWeights: stats.prevSessionWeights,
+        prevSessionSets: stats.prevSessionSets,
         volume4w: stats.volume4w,
         avgRpe4w: stats.avgRpe4w,
         recentSessions: stats.recentSessions.map((s) => ({ date: s.date, scheme: s.scheme })),

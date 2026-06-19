@@ -307,11 +307,9 @@ export function useSessionPlayer(data: PlayerData) {
     (seconds: number) => {
       const rest = stateRef.current.rest;
       if (!rest) return;
-      dispatch({
-        type: "START_REST",
-        exerciseIndex: rest.exerciseIndex,
-        endsAt: rest.endsAt + seconds * 1000,
-      });
+      // Clamp so removing time never lands before "now".
+      const endsAt = Math.max(Date.now(), rest.endsAt + seconds * 1000);
+      dispatch({ type: "START_REST", exerciseIndex: rest.exerciseIndex, endsAt });
     },
     [dispatch],
   );

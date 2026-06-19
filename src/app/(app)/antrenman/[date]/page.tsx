@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { getISOWeek } from "date-fns";
 import { ArrowLeft, ArrowRight, CheckCircle2, Play, RotateCcw } from "lucide-react";
 
-import { LabHeader, LabPage, PaperCard, SectionLabel } from "@/components/lab/lab";
+import { LabHeader, LabPage, PaperCard } from "@/components/lab/lab";
 import { InsightNotes } from "@/components/library/insight-note";
 import { SessionTimer } from "@/components/logbook/session-timer";
 import { requireProfile } from "@/lib/auth";
@@ -29,10 +29,19 @@ type DaySession = {
   id: string;
   assignment_id: string | null;
   completed: boolean;
+  completed_at: string | null;
   notes: string | null;
   created_at: string;
   log_sets: LogSet[];
 };
+
+/** Compact duration like "1 sa 37 dk" / "42 dk". */
+function formatDuration(ms: number): string {
+  const mins = Math.max(0, Math.round(ms / 60000));
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return h > 0 ? `${h} sa ${m} dk` : `${m} dk`;
+}
 
 export default async function WorkoutDayPage({
   params,
@@ -60,7 +69,7 @@ export default async function WorkoutDayPage({
   const { data: sessionsData } = assignmentIds.length
     ? await supabase
         .from("log_sessions")
-        .select("id, assignment_id, completed, notes, created_at, log_sets(*)")
+        .select("id, assignment_id, completed, completed_at, notes, created_at, log_sets(*)")
         .eq("athlete_id", profile.id)
         .in("assignment_id", assignmentIds)
     : { data: [] as DaySession[] };
@@ -91,7 +100,13 @@ export default async function WorkoutDayPage({
         metaLeft={formatDate(date, "EEEE")}
         metaRight={`Hafta ${getISOWeek(new Date(date))}`}
         title={formatDate(date, "d MMMM yyyy")}
-        subtitle={workoutNames || "Bugün için planlı antrenman yok"}
+        subtitle={
+          workoutNames ? (
+            <span className="font-semibold not-italic text-foreground">{workoutNames}</span>
+          ) : (
+            "Bugün için planlı antrenman yok"
+          )
+        }
       />
 
       {assignments.length === 0 ? (
@@ -126,6 +141,12 @@ export default async function WorkoutDayPage({
               );
             }
 
+            const durationMs =
+              completed && session?.completed_at
+                ? new Date(session.completed_at).getTime() -
+                  new Date(session.created_at).getTime()
+                : null;
+
             const href = `/antrenman/${date}/seans?a=${assignment.id}`;
             const cta = completed
               ? { label: "Antrenmana dön", Icon: RotateCcw }
@@ -135,28 +156,33 @@ export default async function WorkoutDayPage({
 
             return (
               <PaperCard key={assignment.id} className="overflow-hidden">
-                <div className="flex items-start justify-between gap-3 border-b border-paper-border p-4">
-                  <div className="min-w-0">
-                    <SectionLabel>{workout.name}</SectionLabel>
-                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-                      {completed ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-medium uppercase tracking-[0.14em] text-lab-green">
-                          <CheckCircle2 className="size-3.5" /> Tamamlandı
-                        </span>
-                      ) : inProgress && session ? (
-                        <SessionTimer startIso={session.created_at} />
-                      ) : (
-                        <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-paper-muted">
-                          Başlanmadı
-                        </span>
-                      )}
-                      {volume > 0 ? (
-                        <span className="font-mono text-xs tabular-nums text-muted-foreground">
-                          {volume.toLocaleString("tr-TR")} kg · {loggedSets.length}/
-                          {plannedSets || "—"} set
-                        </span>
-                      ) : null}
-                    </div>
+                <div className="border-b border-paper-border p-5">
+                  <h2 className="font-serif text-2xl font-semibold leading-tight text-lab-ink">
+                    {workout.name}
+                  </h2>
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                    {completed ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium uppercase tracking-[0.14em] text-lab-green">
+                        <CheckCircle2 className="size-3.5" /> Tamamlandı
+                      </span>
+                    ) : inProgress && session ? (
+                      <SessionTimer startIso={session.created_at} />
+                    ) : (
+                      <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-paper-muted">
+                        Başlanmadı
+                      </span>
+                    )}
+                    {volume > 0 ? (
+                      <span className="font-mono text-xs tabular-nums text-muted-foreground">
+                        {volume.toLocaleString("tr-TR")} kg · {loggedSets.length}/
+                        {plannedSets || "—"} set
+                      </span>
+                    ) : null}
+                    {durationMs != null ? (
+                      <span className="font-mono text-xs tabular-nums text-muted-foreground">
+                        {formatDuration(durationMs)}
+                      </span>
+                    ) : null}
                   </div>
                 </div>
 
@@ -168,13 +194,13 @@ export default async function WorkoutDayPage({
                     return (
                       <li
                         key={we.id}
-                        className="flex items-baseline justify-between gap-3 px-4 py-2.5"
+                        className="flex items-center justify-between gap-3 px-5 py-3.5"
                       >
                         <div className="min-w-0">
-                          <p className="truncate font-serif text-[15px] text-paper-foreground">
+                          <p className="truncate font-serif text-base font-semibold text-paper-foreground">
                             {we.exercise?.name ?? "Egzersiz"}
                           </p>
-                          <p className="font-mono text-[11px] tabular-nums text-paper-muted">
+                          <p className="mt-0.5 font-mono text-[11px] tabular-nums text-paper-muted">
                             {we.target_sets ? `${we.target_sets} × ` : ""}
                             {reps ?? "—"}
                             {we.target_weight ? ` @ ${formatNumber(we.target_weight)} kg` : ""}
@@ -183,8 +209,8 @@ export default async function WorkoutDayPage({
                         <span
                           className={
                             target > 0 && done >= target
-                              ? "font-mono text-xs tabular-nums text-lab-green"
-                              : "font-mono text-xs tabular-nums text-paper-muted"
+                              ? "shrink-0 font-mono text-sm tabular-nums text-lab-green"
+                              : "shrink-0 font-mono text-sm tabular-nums text-paper-muted"
                           }
                         >
                           {done}/{target || "—"}
