@@ -91,6 +91,7 @@ export function useSessionPlayer(data: PlayerData) {
   const [online, setOnline] = useState(true);
   const [hydrated, setHydrated] = useState(false);
   const [soundHaptics, setSoundHaptics] = useState(true);
+  const [autoRest, setAutoRest] = useState(true);
 
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -117,9 +118,13 @@ export function useSessionPlayer(data: PlayerData) {
     setOnline(navigator.onLine);
     try {
       const raw = window.localStorage.getItem(SETTINGS_KEY);
-      if (raw) setSoundHaptics(JSON.parse(raw)?.soundHaptics !== false);
+      if (raw) {
+        const s = JSON.parse(raw);
+        setSoundHaptics(s?.soundHaptics !== false);
+        setAutoRest(s?.autoRest !== false);
+      }
     } catch {
-      /* keep default */
+      /* keep defaults */
     }
     setHydrated(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -139,11 +144,11 @@ export function useSessionPlayer(data: PlayerData) {
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ soundHaptics }));
+      window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ soundHaptics, autoRest }));
     } catch {
       /* ignore */
     }
-  }, [soundHaptics]);
+  }, [soundHaptics, autoRest]);
 
   // ---- Online / offline ----
   useEffect(() => {
@@ -349,6 +354,8 @@ export function useSessionPlayer(data: PlayerData) {
     pendingCount: queue.length,
     soundHaptics,
     setSoundHaptics,
+    autoRest,
+    setAutoRest,
     start,
     completeSet,
     deleteSet,

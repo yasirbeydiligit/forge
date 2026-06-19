@@ -11,12 +11,20 @@ import {
   Flag,
   Loader2,
   Play,
+  Settings,
+  Timer,
   Trash2,
-  Volume2,
-  VolumeX,
   X,
 } from "lucide-react";
 
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { formatNumber, formatRepRange, formatRest } from "@/lib/format";
 import { sessionTotals } from "@/lib/session/totals";
 import { cn } from "@/lib/utils";
@@ -120,15 +128,37 @@ export function SessionPlayer({ data }: { data: PlayerData }) {
           ) : player.isSyncing ? (
             <Loader2 className="size-4 animate-spin text-muted-foreground" aria-label="Senkronlanıyor" />
           ) : null}
-          <button
-            type="button"
-            onClick={() => player.setSoundHaptics(!player.soundHaptics)}
-            aria-label={player.soundHaptics ? "Sesi kapat" : "Sesi aç"}
-            aria-pressed={player.soundHaptics}
-            className="flex size-10 items-center justify-center rounded-full text-muted-foreground transition-colors duration-[var(--dur-fast)] ease-soft active:bg-muted"
-          >
-            {player.soundHaptics ? <Volume2 className="size-5" /> : <VolumeX className="size-5" />}
-          </button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                aria-label="Ayarlar"
+                className="flex size-10 items-center justify-center rounded-full text-muted-foreground transition-colors duration-[var(--dur-fast)] ease-soft active:bg-muted"
+              >
+                <Settings className="size-5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="z-[60] w-56">
+              <DropdownMenuLabel>Seans ayarları</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuCheckboxItem
+                checked={player.autoRest}
+                onCheckedChange={(v) => player.setAutoRest(v)}
+                onSelect={(e) => e.preventDefault()}
+              >
+                Otomatik dinlenme
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={player.soundHaptics}
+                onCheckedChange={(v) => player.setSoundHaptics(v)}
+                onSelect={(e) => e.preventDefault()}
+              >
+                Ses & titreşim
+              </DropdownMenuCheckboxItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           {started && !finished ? (
             <button
               type="button"
@@ -192,7 +222,7 @@ function ActiveView({
       player.goToSummary();
       return;
     }
-    if (!state.rest && restSeconds) player.startRest(idx, restSeconds);
+    if (player.autoRest && !state.rest && restSeconds) player.startRest(idx, restSeconds);
     player.setActiveExercise(idx + 1);
   };
 
@@ -228,128 +258,141 @@ function ActiveView({
         })}
       </nav>
 
-      {/* Scroll body */}
-      <div className="relative z-10 flex-1 overflow-y-auto px-4 py-5">
-        <div className="mx-auto w-full max-w-md space-y-4">
-          <div>
-            <div className="flex items-center justify-between gap-2">
-              <button
-                type="button"
-                onClick={() => player.setActiveExercise(idx - 1)}
-                disabled={isFirst}
-                aria-label="Önceki egzersiz"
-                className="flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors duration-[var(--dur-fast)] ease-soft active:bg-muted disabled:opacity-30"
-              >
-                <ChevronLeft className="size-5" />
-              </button>
-              <p className="text-label text-accent-training">
-                Egzersiz {idx + 1}/{data.exercises.length}
-              </p>
-              <button
-                type="button"
-                onClick={() => player.setActiveExercise(idx + 1)}
-                disabled={isLast}
-                aria-label="Sonraki egzersiz"
-                className="flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors duration-[var(--dur-fast)] ease-soft active:bg-muted disabled:opacity-30"
-              >
-                <ChevronRight className="size-5" />
-              </button>
-            </div>
-            <h2 className="mt-1 text-center font-serif text-2xl font-semibold leading-tight text-lab-ink">
-              {meta.name}
-            </h2>
-            <p className="mt-1 text-center font-mono text-xs tabular-nums text-muted-foreground">
-              {plannedLine(meta.target, meta.category)}
-            </p>
-            {meta.notes ? (
-              <p className="mt-1.5 text-center text-xs italic text-muted-foreground">
-                {meta.notes}
-              </p>
-            ) : null}
-          </div>
-
-          {started || exState.sets.length > 0 ? (
-            <LoggedSets meta={meta} sets={exState.sets} onDelete={player.deleteSet} />
-          ) : (
-            <p className="rounded-xl border border-dashed border-border px-4 py-5 text-center text-sm text-muted-foreground">
-              Hazır olduğunda aşağıdan başlat — hedefler yüklü.
-            </p>
-          )}
-
-          <ExerciseHistory stats={meta.stats} />
-        </div>
-      </div>
-
-      {/* Footer thumb zone */}
-      <div className="pb-safe relative z-10 shrink-0 border-t border-border bg-background/95 px-4 pt-3 backdrop-blur">
-        <div className="mx-auto w-full max-w-md">
-          {!started ? (
-            <div className="pb-3">
-              <button
-                type="button"
-                onClick={player.start}
-                className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-base font-semibold text-primary-foreground shadow-raised transition-transform duration-[var(--dur-fast)] ease-soft active:scale-[0.98]"
-              >
-                <Play className="size-5" /> Antrenmanı başlat
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {state.rest ? (
-                <RestTimer
-                  endsAt={state.rest.endsAt}
-                  totalSeconds={data.exercises[state.rest.exerciseIndex]?.target.restSeconds ?? 120}
-                  onDone={player.notifyRestDone}
-                  onSkip={player.clearRest}
-                  onExtend={player.extendRest}
-                />
-              ) : null}
-
-              <SetInput
-                key={`${idx}-${exState.sets.length}`}
-                setNumber={exState.sets.length + 1}
-                suggestedWeight={suggestedWeight}
-                suggestedReps={suggestedReps}
-                targetRpe={meta.target.rpe}
-                onComplete={(input) => {
-                  const pr = player.completeSet(idx, input);
-                  if (restSeconds && restSeconds > 0) player.startRest(idx, restSeconds);
-                  return pr;
-                }}
-              />
-
-              <div className="flex items-center gap-2 pb-3">
+      {/* Mobile: stacked (scroll + footer). Desktop: two-pane (focus | logging). */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
+        {/* Focus / tracking pane */}
+        <div className="flex-1 overflow-y-auto px-4 py-5 lg:px-8 lg:py-8">
+          <div className="mx-auto w-full max-w-md space-y-4 lg:max-w-xl">
+            <div>
+              <div className="flex items-center justify-between gap-2">
                 <button
                   type="button"
                   onClick={() => player.setActiveExercise(idx - 1)}
                   disabled={isFirst}
-                  className="inline-flex h-11 items-center gap-1.5 rounded-xl border border-border px-3 text-sm text-muted-foreground transition-colors duration-[var(--dur-fast)] ease-soft active:bg-muted disabled:opacity-40"
+                  aria-label="Önceki egzersiz"
+                  className="flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors duration-[var(--dur-fast)] ease-soft active:bg-muted disabled:opacity-30"
                 >
-                  <ChevronLeft className="size-4" /> Önceki
+                  <ChevronLeft className="size-5" />
                 </button>
+                <p className="text-label text-accent-training">
+                  Egzersiz {idx + 1}/{data.exercises.length}
+                </p>
                 <button
                   type="button"
-                  onClick={finishExercise}
-                  className={cn(
-                    "ml-auto inline-flex h-11 flex-1 items-center justify-center gap-1.5 rounded-xl px-4 text-sm font-semibold transition-[transform,background-color] duration-[var(--dur-fast)] ease-soft active:scale-[0.98]",
-                    isLast
-                      ? "bg-primary text-primary-foreground shadow-raised"
-                      : "border border-border bg-paper text-foreground",
-                  )}
+                  onClick={() => player.setActiveExercise(idx + 1)}
+                  disabled={isLast}
+                  aria-label="Sonraki egzersiz"
+                  className="flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors duration-[var(--dur-fast)] ease-soft active:bg-muted disabled:opacity-30"
                 >
-                  {isLast ? (
-                    <>
-                      <Flag className="size-4" /> Seansı bitir
-                    </>
-                  ) : (
-                    <>
-                      Hareketi bitir <ArrowRight className="size-4" />
-                    </>
-                  )}
+                  <ChevronRight className="size-5" />
                 </button>
               </div>
+              <h2 className="mt-1 text-center font-serif text-2xl font-semibold leading-tight text-lab-ink lg:text-3xl">
+                {meta.name}
+              </h2>
+              <p className="mt-1 text-center font-mono text-xs tabular-nums text-muted-foreground">
+                {plannedLine(meta.target, meta.category)}
+              </p>
+              {meta.notes ? (
+                <p className="mt-1.5 text-center text-xs italic text-muted-foreground">
+                  {meta.notes}
+                </p>
+              ) : null}
             </div>
-          )}
+
+            {started || exState.sets.length > 0 ? (
+              <LoggedSets meta={meta} sets={exState.sets} onDelete={player.deleteSet} />
+            ) : (
+              <p className="rounded-xl border border-dashed border-border px-4 py-5 text-center text-sm text-muted-foreground">
+                Hazır olduğunda başlat — hedefler yüklü.
+              </p>
+            )}
+
+            <ExerciseHistory stats={meta.stats} />
+          </div>
+        </div>
+
+        {/* Logging pane: bottom footer on mobile, right sidebar on desktop */}
+        <div className="pb-safe relative z-10 shrink-0 border-t border-border bg-background/95 px-4 pt-3 backdrop-blur lg:flex lg:w-[384px] lg:flex-col lg:justify-center lg:overflow-y-auto lg:border-l lg:border-t-0 lg:bg-surface/30 lg:px-6 lg:py-8 lg:backdrop-blur-none">
+          <div className="mx-auto w-full max-w-md">
+            {!started ? (
+              <div className="pb-3 lg:pb-0">
+                <button
+                  type="button"
+                  onClick={player.start}
+                  className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-base font-semibold text-primary-foreground shadow-raised transition-transform duration-[var(--dur-fast)] ease-soft active:scale-[0.98]"
+                >
+                  <Play className="size-5" /> Antrenmanı başlat
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3 pb-3 lg:pb-0">
+                {state.rest ? (
+                  <RestTimer
+                    endsAt={state.rest.endsAt}
+                    totalSeconds={data.exercises[state.rest.exerciseIndex]?.target.restSeconds ?? 120}
+                    onDone={player.notifyRestDone}
+                    onSkip={player.clearRest}
+                    onExtend={player.extendRest}
+                  />
+                ) : restSeconds ? (
+                  <button
+                    type="button"
+                    onClick={() => player.startRest(idx, restSeconds)}
+                    className="flex h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border text-sm text-muted-foreground transition-colors duration-[var(--dur-fast)] ease-soft active:bg-muted"
+                  >
+                    <Timer className="size-4" /> Dinlenmeyi başlat · {formatRest(restSeconds)}
+                  </button>
+                ) : null}
+
+                <SetInput
+                  key={`${idx}-${exState.sets.length}`}
+                  setNumber={exState.sets.length + 1}
+                  suggestedWeight={suggestedWeight}
+                  suggestedReps={suggestedReps}
+                  targetRpe={meta.target.rpe}
+                  onComplete={(input) => {
+                    const pr = player.completeSet(idx, input);
+                    if (player.autoRest && restSeconds && restSeconds > 0) {
+                      player.startRest(idx, restSeconds);
+                    }
+                    return pr;
+                  }}
+                />
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => player.setActiveExercise(idx - 1)}
+                    disabled={isFirst}
+                    className="inline-flex h-11 items-center gap-1.5 rounded-xl border border-border px-3 text-sm text-muted-foreground transition-colors duration-[var(--dur-fast)] ease-soft active:bg-muted disabled:opacity-40"
+                  >
+                    <ChevronLeft className="size-4" /> Önceki
+                  </button>
+                  <button
+                    type="button"
+                    onClick={finishExercise}
+                    className={cn(
+                      "ml-auto inline-flex h-11 flex-1 items-center justify-center gap-1.5 rounded-xl px-4 text-sm font-semibold transition-[transform,background-color] duration-[var(--dur-fast)] ease-soft active:scale-[0.98]",
+                      isLast
+                        ? "bg-primary text-primary-foreground shadow-raised"
+                        : "border border-border bg-paper text-foreground",
+                    )}
+                  >
+                    {isLast ? (
+                      <>
+                        <Flag className="size-4" /> Seansı bitir
+                      </>
+                    ) : (
+                      <>
+                        Hareketi bitir <ArrowRight className="size-4" />
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </>

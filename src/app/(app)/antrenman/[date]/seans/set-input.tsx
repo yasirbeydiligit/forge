@@ -75,10 +75,10 @@ function Stepper({
           placeholder={placeholder}
           aria-label={ariaLabel}
           onChange={(e) => onChange(e.target.value)}
-          className="h-12 w-full rounded-xl border border-border bg-paper text-center font-mono text-2xl tabular-nums text-foreground outline-none transition-colors duration-[var(--dur-fast)] placeholder:text-muted-foreground/45 focus:border-ring focus:ring-[3px] focus:ring-ring/40"
+          className="h-12 w-full rounded-xl border border-border bg-paper text-center font-mono text-lg tabular-nums text-foreground outline-none transition-colors duration-[var(--dur-fast)] placeholder:text-muted-foreground/45 focus:border-ring focus:ring-[3px] focus:ring-ring/40"
         />
         {unit ? (
-          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs text-muted-foreground">
+          <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 font-mono text-[10px] text-muted-foreground/70">
             {unit}
           </span>
         ) : null}

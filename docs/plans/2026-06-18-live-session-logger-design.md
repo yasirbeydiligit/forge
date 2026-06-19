@@ -215,3 +215,16 @@ After dogfooding the first version, the following refinements landed:
 - **Richer summary:** hero metrics gained a volume **Δ vs last session** and a
   total-reps line; a per-exercise breakdown lists every set as a chip with its
   Δ-vs-last and PR marker.
+
+### Round 2 (2026-06-19 PM)
+
+- **Auto-rest is now a setting** (default on), in a header settings menu alongside
+  "Ses & titreşim". A manual **Dinlenmeyi başlat** button is always available when
+  no rest is running, so rest is reachable even with auto off.
+- **Desktop two-pane** (`lg+`): left = exercise focus + logged sets + history
+  (coach-readable), right = the logging panel (set input / rest / nav). Mobile
+  stays a single column with the logging panel as the bottom footer.
+- **Rest timer redesign:** tinted bar whose background drains as time elapses,
+  plus the ring and a larger countdown.
+- Set-input figures shrunk (`text-2xl` → `text-lg`) so the kg value no longer
+  crowds the unit.
