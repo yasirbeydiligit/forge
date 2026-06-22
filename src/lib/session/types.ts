@@ -12,7 +12,7 @@ export type ExerciseTarget = {
   repsMin: number | null;
   repsMax: number | null;
   weight: number | null;
-  rpe: number | null;
+  rir: number | null;
   restSeconds: number | null;
 };
 
@@ -31,7 +31,7 @@ export type SetEntry = {
   serverId: string | null;
   weight: number | null;
   reps: number | null;
-  rpe: number | null;
+  rir: number | null;
   note: string | null;
   /** ms epoch when the set was marked complete. */
   completedAt: number;

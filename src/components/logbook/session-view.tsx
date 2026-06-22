@@ -8,7 +8,7 @@ export type SessionSetRow = {
   set_number: number;
   weight: number | null;
   reps: number | null;
-  rpe: number | null;
+  rir: number | null;
   notes: string | null;
   exercise_id: string;
   exercise: { name: string } | null;
@@ -86,8 +86,8 @@ export function SessionView({ session }: { session: SessionRow }) {
                     <span className="font-semibold">{formatNumber(s.weight)}</span>
                     <span className="text-paper-muted">×</span>
                     <span className="font-semibold">{s.reps ?? "—"}</span>
-                    {s.rpe ? (
-                      <span className="text-paper-muted">@{formatNumber(s.rpe)}</span>
+                    {s.rir ? (
+                      <span className="text-paper-muted">@{formatNumber(s.rir)}</span>
                     ) : null}
                   </span>
                 ))}

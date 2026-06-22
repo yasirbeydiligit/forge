@@ -6,7 +6,7 @@ function row(overrides: Partial<HistorySetRow>): HistorySetRow {
   return {
     weight: 60,
     reps: 5,
-    rpe: null,
+    rir: null,
     set_number: 1,
     exercise_id: "e1",
     created_at: "2026-06-12T10:00:00Z",

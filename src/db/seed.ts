@@ -124,7 +124,7 @@ type WeSpec = {
   repsMin?: number;
   repsMax?: number;
   weight?: number;
-  rpe?: number;
+  rir?: number;
   rest?: number;
 };
 type WorkoutSpec = { name: string; notes?: string; exercises: WeSpec[] };
@@ -144,7 +144,7 @@ const WORKOUTS: WorkoutSpec[] = [
     name: "Gün B — Çekiş",
     notes: "Sırt ve biceps odaklı.",
     exercises: [
-      { exercise: "Deadlift", sets: 3, repsMin: 5, repsMax: 5, weight: 100, rpe: 8, rest: 180 },
+      { exercise: "Deadlift", sets: 3, repsMin: 5, repsMax: 5, weight: 100, rir: 2, rest: 180 },
       { exercise: "Barbell Row", sets: 4, repsMin: 8, repsMax: 8, rest: 120 },
       { exercise: "Lat Pulldown", sets: 3, repsMin: 10, repsMax: 12, rest: 90 },
       { exercise: "Dumbbell Curl", sets: 3, repsMin: 10, repsMax: 12, rest: 60 },
@@ -215,7 +215,7 @@ async function ensureProgram(
           target_reps_min: e.repsMin ?? null,
           target_reps_max: e.repsMax ?? null,
           target_weight: e.weight ?? null,
-          target_rpe: e.rpe ?? null,
+          target_rir: e.rir ?? null,
           rest_seconds: e.rest ?? null,
         })),
     );

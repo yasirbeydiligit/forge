@@ -9,7 +9,7 @@ function set(overrides: Partial<SetEntry> = {}): SetEntry {
     serverId: null,
     weight: 100,
     reps: 5,
-    rpe: null,
+    rir: null,
     note: null,
     completedAt: 0,
     pr: false,

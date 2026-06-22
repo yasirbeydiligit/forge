@@ -14,7 +14,7 @@ export type LogSetPayload = {
   setNumber: number;
   weight: number | null;
   reps: number | null;
-  rpe: number | null;
+  rir: number | null;
   note: string | null;
 };
 

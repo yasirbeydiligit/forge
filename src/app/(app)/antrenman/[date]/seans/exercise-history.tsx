@@ -54,7 +54,7 @@ export function ExerciseHistory({ stats }: { stats: PlayerStats }) {
             <Stat label="tah. 1RM" value={stats.bestEst1RM ?? "—"} />
             <Stat label="PR kg" value={stats.allTimePr ?? "—"} />
             <Stat label="hacim·4h" value={stats.volume4w.toLocaleString("tr-TR")} />
-            <Stat label="RPE·4h" value={stats.avgRpe4w ?? "—"} />
+            <Stat label="RIR·4h" value={stats.avgRir4w ?? "—"} />
           </div>
 
           <div className="mt-3 flex items-start justify-between gap-3 border-t border-paper-border pt-3">

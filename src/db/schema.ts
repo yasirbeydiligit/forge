@@ -10,6 +10,7 @@
 import { sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   customType,
   date,
   index,
@@ -172,14 +173,21 @@ export const workoutExercises = pgTable(
     targetRepsMin: integer("target_reps_min"),
     targetRepsMax: integer("target_reps_max"),
     targetWeight: numeric("target_weight", { precision: 6, scale: 2 }),
-    targetRpe: numeric("target_rpe", { precision: 3, scale: 1 }),
+    // RIR (Reps in Reserve), 0–10, 0.5 steps; always optional. Replaces RPE.
+    targetRir: numeric("target_rir", { precision: 3, scale: 1 }),
     restSeconds: integer("rest_seconds"),
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
-  (t) => [index("workout_exercises_workout_idx").on(t.workoutId, t.orderIndex)],
+  (t) => [
+    index("workout_exercises_workout_idx").on(t.workoutId, t.orderIndex),
+    check(
+      "workout_exercises_target_rir_range",
+      sql`${t.targetRir} IS NULL OR (${t.targetRir} >= 0 AND ${t.targetRir} <= 10)`,
+    ),
+  ],
 );
 
 /* -------------------------------------------------------------------------- */
@@ -288,7 +296,8 @@ export const logSets = pgTable(
     setNumber: integer("set_number").notNull(),
     weight: numeric("weight", { precision: 6, scale: 2 }),
     reps: integer("reps"),
-    rpe: numeric("rpe", { precision: 3, scale: 1 }),
+    // RIR (Reps in Reserve), 0–10, 0.5 steps; always optional. Replaces RPE.
+    rir: numeric("rir", { precision: 3, scale: 1 }),
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -297,6 +306,10 @@ export const logSets = pgTable(
   (t) => [
     index("log_sets_session_idx").on(t.sessionId),
     index("log_sets_exercise_idx").on(t.exerciseId),
+    check(
+      "log_sets_rir_range",
+      sql`${t.rir} IS NULL OR (${t.rir} >= 0 AND ${t.rir} <= 10)`,
+    ),
   ],
 );
 

@@ -78,7 +78,7 @@ export function WorkoutExerciseDialog({
             {isEdit ? "Egzersizi düzenle" : "Antrenmana egzersiz ekle"}
           </DialogTitle>
           <DialogDescription>
-            Hedef set, tekrar ve ağırlık/RPE değerlerini belirle.
+            Hedef set, tekrar ve ağırlık/RIR değerlerini belirle.
           </DialogDescription>
         </DialogHeader>
 
@@ -157,16 +157,17 @@ export function WorkoutExerciseDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="targetRpe">RPE</Label>
+              <Label htmlFor="targetRir">RIR</Label>
               <Input
-                id="targetRpe"
-                name="targetRpe"
+                id="targetRir"
+                name="targetRir"
                 type="number"
                 step="0.5"
                 min={0}
                 max={10}
-                defaultValue={workoutExercise?.target_rpe ?? ""}
-                placeholder="8"
+                defaultValue={workoutExercise?.target_rir ?? ""}
+                placeholder="2"
+                title="RIR = Yedekte kalan tekrar (0 = tam başarısızlık)"
               />
             </div>
             <div className="space-y-2">

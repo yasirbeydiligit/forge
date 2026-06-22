@@ -681,7 +681,7 @@ export type Database = {
           id: string
           notes: string | null
           reps: number | null
-          rpe: number | null
+          rir: number | null
           session_id: string
           set_number: number
           weight: number | null
@@ -693,7 +693,7 @@ export type Database = {
           id?: string
           notes?: string | null
           reps?: number | null
-          rpe?: number | null
+          rir?: number | null
           session_id: string
           set_number: number
           weight?: number | null
@@ -705,7 +705,7 @@ export type Database = {
           id?: string
           notes?: string | null
           reps?: number | null
-          rpe?: number | null
+          rir?: number | null
           session_id?: string
           set_number?: number
           weight?: number | null
@@ -901,7 +901,7 @@ export type Database = {
           rest_seconds: number | null
           target_reps_max: number | null
           target_reps_min: number | null
-          target_rpe: number | null
+          target_rir: number | null
           target_sets: number | null
           target_weight: number | null
           workout_id: string
@@ -915,7 +915,7 @@ export type Database = {
           rest_seconds?: number | null
           target_reps_max?: number | null
           target_reps_min?: number | null
-          target_rpe?: number | null
+          target_rir?: number | null
           target_sets?: number | null
           target_weight?: number | null
           workout_id: string
@@ -929,7 +929,7 @@ export type Database = {
           rest_seconds?: number | null
           target_reps_max?: number | null
           target_reps_min?: number | null
-          target_rpe?: number | null
+          target_rir?: number | null
           target_sets?: number | null
           target_weight?: number | null
           workout_id?: string

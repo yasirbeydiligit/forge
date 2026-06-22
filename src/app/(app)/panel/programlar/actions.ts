@@ -190,7 +190,7 @@ const workoutExerciseSchema = z.object({
   targetRepsMin: optionalInt,
   targetRepsMax: optionalInt,
   targetWeight: optionalNum,
-  targetRpe: optionalNum,
+  targetRir: optionalNum,
   restSeconds: optionalInt,
   notes: z.string().trim().optional().nullable(),
 });
@@ -208,7 +208,7 @@ export async function addWorkoutExercise(
     targetRepsMin: formData.get("targetRepsMin"),
     targetRepsMax: formData.get("targetRepsMax"),
     targetWeight: formData.get("targetWeight"),
-    targetRpe: formData.get("targetRpe"),
+    targetRir: formData.get("targetRir"),
     restSeconds: formData.get("restSeconds"),
     notes: formData.get("notes") || null,
   });
@@ -231,7 +231,7 @@ export async function addWorkoutExercise(
     target_reps_min: d.targetRepsMin,
     target_reps_max: d.targetRepsMax,
     target_weight: d.targetWeight,
-    target_rpe: d.targetRpe,
+    target_rir: d.targetRir,
     rest_seconds: d.restSeconds,
     notes: d.notes || null,
   });
@@ -255,7 +255,7 @@ export async function updateWorkoutExercise(
     targetRepsMin: formData.get("targetRepsMin"),
     targetRepsMax: formData.get("targetRepsMax"),
     targetWeight: formData.get("targetWeight"),
-    targetRpe: formData.get("targetRpe"),
+    targetRir: formData.get("targetRir"),
     restSeconds: formData.get("restSeconds"),
     notes: formData.get("notes") || null,
   });
@@ -273,7 +273,7 @@ export async function updateWorkoutExercise(
       target_reps_min: d.targetRepsMin,
       target_reps_max: d.targetRepsMax,
       target_weight: d.targetWeight,
-      target_rpe: d.targetRpe,
+      target_rir: d.targetRir,
       rest_seconds: d.restSeconds,
       notes: d.notes || null,
     })

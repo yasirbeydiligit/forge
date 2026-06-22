@@ -40,7 +40,7 @@ export default async function AthleteDetailPage({
       supabase
         .from("log_sessions")
         .select(
-          "id, session_date, completed, notes, workout:workouts(name), log_sets(id, set_number, weight, reps, rpe, notes, exercise_id, exercise:exercises(name))",
+          "id, session_date, completed, notes, workout:workouts(name), log_sets(id, set_number, weight, reps, rir, notes, exercise_id, exercise:exercises(name))",
         )
         .eq("athlete_id", athleteId)
         .order("session_date", { ascending: false })
