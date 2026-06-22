@@ -62,6 +62,43 @@ export const documentStatus = pgEnum("document_status", [
   "failed",
 ]);
 
+/**
+ * Exercise taxonomy enums — the backbone of alternative matching and reporting.
+ * Canonical machine values live here (type-safe, stable, used as the matching
+ * key); Turkish display labels are a code-level map (see src/lib/taxonomy.ts).
+ */
+export const movementPattern = pgEnum("movement_pattern", [
+  "push_horizontal",
+  "push_vertical",
+  "pull_horizontal",
+  "pull_vertical",
+  "squat",
+  "hinge",
+  "lunge",
+  "isolation",
+  "carry",
+  "core",
+  "rotation",
+]);
+export const equipmentType = pgEnum("equipment_type", [
+  "barbell",
+  "dumbbell",
+  "machine",
+  "cable",
+  "bodyweight",
+  "kettlebell",
+  "band",
+  "smith",
+  "ez_bar",
+  "trap_bar",
+  "other",
+]);
+export const muscleRegion = pgEnum("muscle_region", ["upper", "lower", "core"]);
+export const exerciseMuscleRole = pgEnum("exercise_muscle_role", [
+  "primary",
+  "secondary",
+]);
+
 /* -------------------------------------------------------------------------- */
 /*  Identity                                                                  */
 /* -------------------------------------------------------------------------- */
@@ -110,9 +147,19 @@ export const exercises = pgTable(
   {
     id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
     name: text("name").notNull(),
+    // Stable human-readable key for system exercises; the CSV import upserts on
+    // it so re-imports update in place instead of duplicating. Nullable: ad-hoc
+    // user exercises (later phase) may have none.
+    slug: text("slug"),
+    // Legacy free-text grouping label, kept for existing UI; the taxonomy below
+    // (movement_pattern + muscle targets) is the real classification.
     category: text("category"),
     description: text("description"),
     videoUrl: text("video_url"),
+    movementPattern: movementPattern("movement_pattern"),
+    equipmentType: equipmentType("equipment_type"),
+    // Forge-provided (visible to everyone) vs user/coach-defined (owner-only).
+    isSystem: boolean("is_system").notNull().default(false),
     createdBy: uuid("created_by").references(() => profiles.id, {
       onDelete: "set null",
     }),
@@ -120,7 +167,125 @@ export const exercises = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [index("exercises_name_idx").on(t.name)],
+  (t) => [
+    index("exercises_name_idx").on(t.name),
+    index("exercises_pattern_idx").on(t.movementPattern),
+    unique("exercises_slug_key").on(t.slug),
+  ],
+);
+
+/* -------------------------------------------------------------------------- */
+/*  Exercise taxonomy: muscles, functions, targets, alternatives              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A muscle. Carries both a Turkish display name and the Latin/technical name.
+ * `slug` is the stable key the CSV import and muscle_functions reference.
+ */
+export const muscles = pgTable(
+  "muscles",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    slug: text("slug").notNull(),
+    nameTr: text("name_tr").notNull(),
+    nameLatin: text("name_latin"),
+    region: muscleRegion("region").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [unique("muscles_slug_key").on(t.slug)],
+);
+
+/**
+ * A distinct FUNCTION of a muscle (one muscle can have several). This is what
+ * makes "Lat shoulder-extension" vs "Lat shoulder-adduction" separable, so a
+ * Pullover and a Lat Pulldown both hit the lat but via different functions.
+ * Globally-unique `slug` so the CSV references a target by function slug alone
+ * (the muscle is derivable through the FK).
+ */
+export const muscleFunctions = pgTable(
+  "muscle_functions",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    muscleId: uuid("muscle_id")
+      .notNull()
+      .references(() => muscles.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
+    nameTr: text("name_tr").notNull(),
+    nameTechnical: text("name_technical"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    unique("muscle_functions_slug_key").on(t.slug),
+    index("muscle_functions_muscle_idx").on(t.muscleId),
+  ],
+);
+
+/**
+ * Links an exercise to a (muscle + function) pair with a role. Reporting tracks
+ * volume per muscle_function_id, so swapping to an alternative that shares the
+ * same primary target keeps the muscle/function history continuous.
+ */
+export const exerciseMuscleTargets = pgTable(
+  "exercise_muscle_targets",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    exerciseId: uuid("exercise_id")
+      .notNull()
+      .references(() => exercises.id, { onDelete: "cascade" }),
+    muscleFunctionId: uuid("muscle_function_id")
+      .notNull()
+      .references(() => muscleFunctions.id, { onDelete: "restrict" }),
+    role: exerciseMuscleRole("role").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    unique("exercise_muscle_targets_unique").on(
+      t.exerciseId,
+      t.muscleFunctionId,
+    ),
+    index("exercise_muscle_targets_exercise_idx").on(t.exerciseId),
+    index("exercise_muscle_targets_function_idx").on(t.muscleFunctionId),
+  ],
+);
+
+/**
+ * Manually-curated alternative pairing (coach says X ≈ Y). Stored as a single
+ * row; lookups treat it as SYMMETRIC (match on either side). Automatic
+ * suggestions (same movement_pattern + shared primary target) come from the
+ * public.suggest_exercise_alternatives() SQL function, not this table.
+ */
+export const exerciseAlternatives = pgTable(
+  "exercise_alternatives",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    exerciseId: uuid("exercise_id")
+      .notNull()
+      .references(() => exercises.id, { onDelete: "cascade" }),
+    alternativeId: uuid("alternative_id")
+      .notNull()
+      .references(() => exercises.id, { onDelete: "cascade" }),
+    note: text("note"),
+    createdBy: uuid("created_by").references(() => profiles.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    unique("exercise_alternatives_unique").on(t.exerciseId, t.alternativeId),
+    check(
+      "exercise_alternatives_distinct",
+      sql`${t.exerciseId} <> ${t.alternativeId}`,
+    ),
+    index("exercise_alternatives_exercise_idx").on(t.exerciseId),
+  ],
 );
 
 export const programs = pgTable(
