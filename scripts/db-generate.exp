@@ -1,0 +1,14 @@
+#!/usr/bin/expect -f
+# Drives `drizzle-kit generate` non-interactively. The only ambiguity is the
+# rpe->rir / target_rpe->target_rir column renames; we take the default
+# (highlighted "create column" => drop+create), which is correct because there
+# is no production data to preserve.
+set timeout 120
+spawn npx drizzle-kit generate
+expect {
+  -re {created or renamed} { send "\r"; exp_continue }
+  -re {(?i)rename}         { send "\r"; exp_continue }
+  eof
+}
+catch wait result
+exit [lindex $result 3]

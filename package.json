@@ -11,11 +11,13 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
+    "db:generate:auto": "expect scripts/db-generate.exp",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "seed": "tsx src/db/seed.ts",
     "seed:insight-rules": "tsx scripts/seed-insight-rules.ts",
     "seed:demo-athlete": "tsx scripts/seed-demo-athlete.ts",
+    "seed:taxonomy": "tsx scripts/import-exercise-taxonomy.ts",
     "ingest:library": "tsx scripts/ingest-library.ts"
   },
   "dependencies": {
