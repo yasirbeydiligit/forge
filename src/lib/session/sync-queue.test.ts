@@ -11,7 +11,7 @@ const payload: LogSetPayload = {
   setNumber: 1,
   weight: 100,
   reps: 5,
-  rpe: null,
+  rir: null,
   note: null,
 };
 

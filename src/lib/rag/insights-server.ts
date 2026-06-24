@@ -26,7 +26,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { toDateKey } from "@/lib/format";
 import {
-  setsAvgRpe,
+  setsAvgRir,
   setsVolume,
   type HistorySetRow,
 } from "@/lib/logbook-stats";
@@ -50,14 +50,15 @@ type Supabase = SupabaseClient<Database>;
  *        ((this 7d volume − previous 7d volume) / previous 7d volume) × 100,
  *        using sum(weight × reps) across all logged sets. null if there is no
  *        previous-week volume to compare against (avoids divide-by-zero).
- *  - `rpe_7d`             average set RPE over the last 7 days
- *        (log_sets.rpe joined to log_sessions.session_date). null if no RPE.
+ *  - `rir_7d`             average set RIR over the last 7 days
+ *        (log_sets.rir joined to log_sessions.session_date). null if no RIR.
+ *        NOTE: RIR is inverse to effort — a LOW value means close to failure.
  */
 export const METRIC_KEYS = [
   "protein_per_bw_7d",
   "sleep_hours_7d",
   "volume_wow_pct",
-  "rpe_7d",
+  "rir_7d",
 ] as const;
 
 export type MetricKey = (typeof METRIC_KEYS)[number];
@@ -179,7 +180,7 @@ async function sleepHours7d(
 /**
  * Fetch the athlete's logged sets (with session_date) over the last 14 days,
  * flattened to the HistorySetRow shape that logbook-stats consumes. Shared by
- * the volume-WoW and RPE metrics so we only hit the DB once.
+ * the volume-WoW and RIR metrics so we only hit the DB once.
  */
 async function recentHistoryRows(
   supabase: Supabase,
@@ -190,7 +191,7 @@ async function recentHistoryRows(
   const { data } = await supabase
     .from("log_sets")
     .select(
-      "weight, reps, rpe, set_number, exercise_id, created_at, session:log_sessions!inner(session_date, athlete_id)",
+      "weight, reps, rir, set_number, exercise_id, created_at, session:log_sessions!inner(session_date, athlete_id)",
     )
     .eq("session.athlete_id", athleteId)
     .gte("session.session_date", since);
@@ -229,16 +230,16 @@ function volumeWowPct(rows: HistorySetRow[], today: Date): number | null {
 }
 
 /**
- * average set RPE over the last 7 days. Reuses logbook-stats' `setsAvgRpe`
- * (the same mean-RPE math behind the workout day page's `avgRpe4w`), windowed
+ * average set RIR over the last 7 days. Reuses logbook-stats' `setsAvgRir`
+ * (the same mean-RIR math behind the workout day page's `avgRir4w`), windowed
  * to the trailing 7 days.
  */
-function rpe7d(rows: HistorySetRow[], today: Date): number | null {
+function rir7d(rows: HistorySetRow[], today: Date): number | null {
   const since = subDays(today, 6).getTime();
   const inWindow = rows.filter(
     (r) => new Date(r.session_date).getTime() >= since,
   );
-  return setsAvgRpe(inWindow);
+  return setsAvgRir(inWindow);
 }
 
 /**
@@ -255,7 +256,7 @@ async function computeMetrics(
   const metrics: Record<string, number | null> = {};
 
   const wantsHistory =
-    needed.has("volume_wow_pct") || needed.has("rpe_7d");
+    needed.has("volume_wow_pct") || needed.has("rir_7d");
 
   const [protein, sleep, history] = await Promise.all([
     needed.has("protein_per_bw_7d")
@@ -276,7 +277,7 @@ async function computeMetrics(
   if (needed.has("volume_wow_pct")) {
     metrics.volume_wow_pct = volumeWowPct(history, today);
   }
-  if (needed.has("rpe_7d")) metrics.rpe_7d = rpe7d(history, today);
+  if (needed.has("rir_7d")) metrics.rir_7d = rir7d(history, today);
 
   return metrics;
 }

@@ -220,8 +220,8 @@ export default async function ProgramDetailPage({
                             {item.target_weight ? (
                               <span>{formatNumber(item.target_weight, " kg")}</span>
                             ) : null}
-                            {item.target_rpe ? (
-                              <span>RPE {formatNumber(item.target_rpe)}</span>
+                            {item.target_rir ? (
+                              <span>RIR {formatNumber(item.target_rir)}</span>
                             ) : null}
                             {rest ? <span>{rest} dinlenme</span> : null}
                           </div>

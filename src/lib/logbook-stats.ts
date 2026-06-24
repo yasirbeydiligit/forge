@@ -1,13 +1,13 @@
 /**
  * Logbook analytics — pure functions computed from an athlete's historical
  * sets for a single exercise. Used to power VS LAST, estimated 1RM, recent
- * history, 4-week volume/RPE and trend on the workout day page.
+ * history, 4-week volume/RIR and trend on the workout day page.
  */
 
 export type HistorySetRow = {
   weight: number | null;
   reps: number | null;
-  rpe: number | null;
+  rir: number | null;
   set_number: number;
   exercise_id: string;
   created_at: string;
@@ -19,7 +19,7 @@ export type SessionSummary = {
   topWeight: number;
   scheme: string; // e.g. "3 × 5 @ 80"
   volume: number;
-  avgRpe: number | null;
+  avgRir: number | null;
 };
 
 export type ExerciseStats = {
@@ -27,7 +27,7 @@ export type ExerciseStats = {
   allTimePr: number | null;
   allTimePrDate: string | null;
   volume4w: number;
-  avgRpe4w: number | null;
+  avgRir4w: number | null;
   recentSessions: SessionSummary[]; // newest first, max 4
   /** Best top-weight delta across the 28-day window (kg). */
   trendDelta: number | null;
@@ -62,13 +62,13 @@ export function setsVolume(sets: HistorySetRow[]): number {
 }
 
 /**
- * Mean RPE across the given sets (ignoring sets without an RPE), or null when
- * none have one. Single source of truth for "average RPE".
+ * Mean RIR across the given sets (ignoring sets without an RIR), or null when
+ * none have one. Single source of truth for "average RIR".
  */
-export function setsAvgRpe(sets: HistorySetRow[]): number | null {
-  const rpes = sets.map((s) => s.rpe).filter((r): r is number => r != null);
-  if (rpes.length === 0) return null;
-  return rpes.reduce((a, b) => a + Number(b), 0) / rpes.length;
+export function setsAvgRir(sets: HistorySetRow[]): number | null {
+  const rirs = sets.map((s) => s.rir).filter((r): r is number => r != null);
+  if (rirs.length === 0) return null;
+  return rirs.reduce((a, b) => a + Number(b), 0) / rirs.length;
 }
 
 function round1(n: number): number {
@@ -88,8 +88,8 @@ function summariseSession(date: string, sets: HistorySetRow[]): SessionSummary {
   const valid = sets.filter((s) => s.weight != null && s.reps != null);
   const topWeight = valid.reduce((m, s) => Math.max(m, Number(s.weight)), 0);
   const volume = setsVolume(valid);
-  const meanRpe = setsAvgRpe(valid);
-  const avgRpe = meanRpe != null ? round1(meanRpe) : null;
+  const meanRir = setsAvgRir(valid);
+  const avgRir = meanRir != null ? round1(meanRir) : null;
 
   // Compact scheme using the most common reps at the top weight.
   const topSets = valid.filter((s) => Number(s.weight) === topWeight);
@@ -99,7 +99,7 @@ function summariseSession(date: string, sets: HistorySetRow[]): SessionSummary {
       ? `${topSets.length || valid.length} × ${reps} @ ${round1(topWeight)}`
       : `${valid.length} set`;
 
-  return { date, topWeight: round1(topWeight), scheme, volume, avgRpe };
+  return { date, topWeight: round1(topWeight), scheme, volume, avgRir };
 }
 
 export function computeExerciseStats(
@@ -131,8 +131,8 @@ export function computeExerciseStats(
     (s) => new Date(s.session_date).getTime() >= windowStart,
   );
   const volume4w = setsVolume(inWindow);
-  const meanRpe4w = setsAvgRpe(inWindow);
-  const avgRpe4w = meanRpe4w != null ? round1(meanRpe4w) : null;
+  const meanRir4w = setsAvgRir(inWindow);
+  const avgRir4w = meanRir4w != null ? round1(meanRir4w) : null;
 
   // Sessions newest → oldest.
   const bySession = groupBySession(valid);
@@ -175,7 +175,7 @@ export function computeExerciseStats(
     allTimePr: allTimePr != null ? round1(allTimePr) : null,
     allTimePrDate,
     volume4w: Math.round(volume4w),
-    avgRpe4w,
+    avgRir4w,
     recentSessions,
     trendDelta,
     trendPoints,

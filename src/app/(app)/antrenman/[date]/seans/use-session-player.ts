@@ -34,7 +34,7 @@ const SETTINGS_KEY = "forge:session:settings:v1";
 export type SetInput = {
   weight: number | null;
   reps: number | null;
-  rpe: number | null;
+  rir: number | null;
   note: string | null;
 };
 
@@ -254,7 +254,7 @@ export function useSessionPlayer(data: PlayerData) {
           serverId: null,
           weight: input.weight,
           reps: input.reps,
-          rpe: input.rpe,
+          rir: input.rir,
           note: input.note,
           completedAt: Date.now(),
           pr,
@@ -272,7 +272,7 @@ export function useSessionPlayer(data: PlayerData) {
           setNumber: ex.sets.length + 1,
           weight: input.weight,
           reps: input.reps,
-          rpe: input.rpe,
+          rir: input.rir,
           note: input.note,
         },
       });

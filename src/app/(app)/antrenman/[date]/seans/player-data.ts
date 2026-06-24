@@ -14,7 +14,7 @@ export type PlayerStats = {
   prevSessionWeights: number[];
   prevSessionSets: { weight: number; reps: number | null }[];
   volume4w: number;
-  avgRpe4w: number | null;
+  avgRir4w: number | null;
   recentSessions: { date: string; scheme: string }[];
   trendPoints: number[];
   trendDelta: number | null;

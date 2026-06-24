@@ -71,7 +71,7 @@ function plannedLine(target: PlayerData["exercises"][number]["target"], category
     target.sets ? `${target.sets} ×` : null,
     reps ?? null,
     target.weight != null ? `@ ${formatNumber(target.weight)} kg` : null,
-    target.rpe != null ? `RPE ${formatNumber(target.rpe)}` : null,
+    target.rir != null ? `RIR ${formatNumber(target.rir)}` : null,
     rest,
   ]
     .filter(Boolean)
@@ -353,7 +353,7 @@ function ActiveView({
                   setNumber={exState.sets.length + 1}
                   suggestedWeight={suggestedWeight}
                   suggestedReps={suggestedReps}
-                  targetRpe={meta.target.rpe}
+                  targetRir={meta.target.rir}
                   onComplete={(input) => {
                     const pr = player.completeSet(idx, input);
                     if (player.autoRest && restSeconds && restSeconds > 0) {
@@ -424,7 +424,7 @@ function LoggedSets({
         <span className="text-center">Set</span>
         <span className="text-center">Kg</span>
         <span className="text-center">Tekrar</span>
-        <span className="text-center">RPE</span>
+        <span className="text-center">RIR</span>
         <span />
       </div>
       {sets.map((s, i) => {
@@ -467,7 +467,7 @@ function LoggedSets({
               {s.reps ?? "—"}
             </span>
             <span className="text-center font-mono tabular-nums text-muted-foreground">
-              {s.rpe != null ? formatNumber(s.rpe) : "—"}
+              {s.rir != null ? formatNumber(s.rir) : "—"}
             </span>
             <button
               type="button"

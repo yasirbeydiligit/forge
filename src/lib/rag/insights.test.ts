@@ -112,14 +112,14 @@ describe("evaluateRules", () => {
     const rules = [
       rule({ key: "low-protein", metric: "protein_per_bw_7d", comparator: "<", threshold: 1.6 }),
       rule({ key: "low-sleep", metric: "sleep_7d", comparator: "<", threshold: 7 }),
-      rule({ key: "high-rpe", metric: "rpe_7d", comparator: ">=", threshold: 9 }),
+      rule({ key: "low-rir", metric: "rir_7d", comparator: "<=", threshold: 2 }),
     ];
     const fired = evaluateRules(rules, {
       protein_per_bw_7d: 1.2, // fires
       sleep_7d: 8, // does not fire
-      rpe_7d: 9.2, // fires
+      rir_7d: 1.2, // fires (low RIR = near failure)
     });
-    expect(fired.map((f) => f.key)).toEqual(["low-protein", "high-rpe"]);
+    expect(fired.map((f) => f.key)).toEqual(["low-protein", "low-rir"]);
   });
 
   it("returns [] when given no rules", () => {

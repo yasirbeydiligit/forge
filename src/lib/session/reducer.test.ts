@@ -10,7 +10,7 @@ function set(overrides: Partial<SetEntry> = {}): SetEntry {
     serverId: null,
     weight: 100,
     reps: 5,
-    rpe: null,
+    rir: null,
     note: null,
     completedAt: 1000,
     pr: false,
@@ -53,7 +53,7 @@ describe("createInitialState", () => {
           workoutExerciseId: "we1",
           exerciseId: "e1",
           serverSets: [
-            { id: "srv1", weight: 100, reps: 5, rpe: 8, note: null, completedAt: 500 },
+            { id: "srv1", weight: 100, reps: 5, rir: 8, note: null, completedAt: 500 },
           ],
         },
         { workoutExerciseId: "we2", exerciseId: "e2", serverSets: [] },
@@ -64,7 +64,7 @@ describe("createInitialState", () => {
       serverId: "srv1",
       weight: 100,
       reps: 5,
-      rpe: 8,
+      rir: 8,
     });
     // resume cursor lands on the first exercise that has no sets yet
     expect(s.activeExerciseIndex).toBe(1);
@@ -77,12 +77,12 @@ describe("createInitialState", () => {
         {
           workoutExerciseId: "we1",
           exerciseId: "e1",
-          serverSets: [{ id: "x", weight: 1, reps: 1, rpe: null, note: null, completedAt: 1 }],
+          serverSets: [{ id: "x", weight: 1, reps: 1, rir: null, note: null, completedAt: 1 }],
         },
         {
           workoutExerciseId: "we2",
           exerciseId: "e2",
-          serverSets: [{ id: "y", weight: 1, reps: 1, rpe: null, note: null, completedAt: 1 }],
+          serverSets: [{ id: "y", weight: 1, reps: 1, rir: null, note: null, completedAt: 1 }],
         },
       ],
     });
@@ -163,7 +163,7 @@ describe("hydrate", () => {
         {
           workoutExerciseId: "we1",
           exerciseId: "e1",
-          serverSets: [{ id: "srv1", weight: 100, reps: 5, rpe: null, note: null, completedAt: 1 }],
+          serverSets: [{ id: "srv1", weight: 100, reps: 5, rir: null, note: null, completedAt: 1 }],
         },
         { workoutExerciseId: "we2", exerciseId: "e2", serverSets: [] },
       ],

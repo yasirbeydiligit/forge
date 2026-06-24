@@ -4,7 +4,7 @@
  *   - protein_target (protein_per_bw_7d >= 1.6)
  *   - sleep_low      (sleep_hours_7d   <  7)
  *   - volume_progressing (volume_wow_pct > 0)
- *   - rpe_high       (rpe_7d           >= 8)
+ *   - rir_low        (rir_7d           <= 2)
  *
  * Idempotent: re-running wipes this athlete's meals / daily_metrics / log_*
  * rows and reinserts them. Standalone tsx script (like src/db/seed.ts).
@@ -131,10 +131,10 @@ async function seedMeals(athleteId: string): Promise<void> {
 
 async function seedTraining(athleteId: string, exerciseIds: string[]): Promise<void> {
   // Progressive overload: this week heavier than last week (volume_wow_pct > 0),
-  // this week's RPE ~8.2 (rpe_7d >= 8). 3 sessions/week.
+  // this week's RIR ~1.25 (rir_7d <= 2 → training near failure). 3 sessions/week.
   const weeks = [
-    { offsets: [-12, -10, -8], weights: [80, 60, 100], rpe: [7.5, 8.0] },
-    { offsets: [-5, -3, -1], weights: [90, 67.5, 110], rpe: [8.0, 8.5] },
+    { offsets: [-12, -10, -8], weights: [80, 60, 100], rir: [3.0, 2.5] },
+    { offsets: [-5, -3, -1], weights: [90, 67.5, 110], rir: [1.0, 1.5] },
   ];
   for (const wk of weeks) {
     for (const off of wk.offsets) {
@@ -158,7 +158,7 @@ async function seedTraining(athleteId: string, exerciseIds: string[]): Promise<v
             set_number: s,
             weight: wk.weights[ei],
             reps: 5,
-            rpe: wk.rpe[s % wk.rpe.length],
+            rir: wk.rir[s % wk.rir.length],
           });
         }
       });

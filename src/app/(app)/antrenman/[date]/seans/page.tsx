@@ -73,7 +73,7 @@ export default async function SessionPlayerPage({
       ? supabase
           .from("log_sets")
           .select(
-            "weight, reps, rpe, set_number, exercise_id, created_at, session:log_sessions(session_date)",
+            "weight, reps, rir, set_number, exercise_id, created_at, session:log_sessions(session_date)",
           )
           .in("exercise_id", exerciseIds)
       : Promise.resolve({ data: [] }),
@@ -118,7 +118,7 @@ export default async function SessionPlayerPage({
         repsMin: we.target_reps_min,
         repsMax: we.target_reps_max,
         weight: we.target_weight != null ? Number(we.target_weight) : null,
-        rpe: we.target_rpe != null ? Number(we.target_rpe) : null,
+        rir: we.target_rir != null ? Number(we.target_rir) : null,
         restSeconds: we.rest_seconds,
       },
       stats: {
@@ -128,7 +128,7 @@ export default async function SessionPlayerPage({
         prevSessionWeights: stats.prevSessionWeights,
         prevSessionSets: stats.prevSessionSets,
         volume4w: stats.volume4w,
-        avgRpe4w: stats.avgRpe4w,
+        avgRir4w: stats.avgRir4w,
         recentSessions: stats.recentSessions.map((s) => ({ date: s.date, scheme: s.scheme })),
         trendPoints: stats.trendPoints,
         trendDelta: stats.trendDelta,
@@ -137,7 +137,7 @@ export default async function SessionPlayerPage({
         id: s.id,
         weight: s.weight != null ? Number(s.weight) : null,
         reps: s.reps,
-        rpe: s.rpe != null ? Number(s.rpe) : null,
+        rir: s.rir != null ? Number(s.rir) : null,
         note: s.notes,
         completedAt: new Date(s.created_at).getTime(),
       })),

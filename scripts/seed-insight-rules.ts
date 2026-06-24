@@ -107,14 +107,16 @@ const RULES: RuleSpec[] = [
     chunkPhrase: "volume",
   },
   {
-    key: "rpe_high",
-    metric: "rpe_7d",
-    comparator: ">=",
-    threshold: 8,
+    // RIR is inverse to effort: a LOW weekly average means training near failure.
+    key: "rir_low",
+    metric: "rir_7d",
+    comparator: "<=",
+    threshold: 2,
     scope: "training",
-    retrieval_query: "rating of perceived effort RPE autoregulation training intensity",
+    retrieval_query:
+      "reps in reserve RIR proximity to failure autoregulation training intensity",
     note_template:
-      "Son 7 günün ortalama RPE'si {value} — oldukça yüksek; RPE'ye dayalı oto-regülasyonla yükü ayarlamayı düşünebilirsin.",
+      "Son 7 günün ortalama RIR'i {value} — oldukça düşük (başarısızlığa yakın çalışıyorsun); RIR'e dayalı oto-regülasyonla yükü biraz geri çekmeyi düşünebilirsin.",
     enabled: true,
     // "Prescribing Intensity in Resistance Training Using Rating of Perceived Effort".
     titleKeywords: ["perceived effort", "RPE"],

@@ -9,13 +9,13 @@ type Props = {
   setNumber: number;
   suggestedWeight: number | null;
   suggestedReps: number | null;
-  targetRpe: number | null;
+  targetRir: number | null;
   weightStep?: number;
   /** Returns true when the logged set was a PR (so the caller can celebrate). */
   onComplete: (input: {
     weight: number | null;
     reps: number | null;
-    rpe: number | null;
+    rir: number | null;
     note: string | null;
   }) => boolean;
 };
@@ -99,15 +99,15 @@ export function SetInput({
   setNumber,
   suggestedWeight,
   suggestedReps,
-  targetRpe,
+  targetRir,
   weightStep = 2.5,
   onComplete,
 }: Props) {
   const [weight, setWeight] = useState("");
   const [reps, setReps] = useState("");
-  const [rpe, setRpe] = useState("");
+  const [rir, setRir] = useState("");
   const [note, setNote] = useState("");
-  const [showRpe, setShowRpe] = useState(false);
+  const [showRir, setShowRir] = useState(false);
   const [showNote, setShowNote] = useState(false);
 
   const submit = () => {
@@ -117,12 +117,12 @@ export function SetInput({
     onComplete({
       weight: w,
       reps: r,
-      rpe: parseNum(rpe),
+      rir: parseNum(rir),
       note: note.trim() ? note.trim() : null,
     });
     setWeight("");
     setReps("");
-    setRpe("");
+    setRir("");
     setNote("");
     setShowNote(false);
   };
@@ -132,8 +132,8 @@ export function SetInput({
       <div className="flex items-center justify-between">
         <span className="text-label text-muted-foreground">Set {setNumber}</span>
         <div className="flex items-center gap-1.5">
-          <Chip active={showRpe} onClick={() => setShowRpe((v) => !v)}>
-            RPE
+          <Chip active={showRir} onClick={() => setShowRir((v) => !v)}>
+            RIR
           </Chip>
           <Chip active={showNote} onClick={() => setShowNote((v) => !v)}>
             + Not
@@ -170,21 +170,24 @@ export function SetInput({
         </div>
       </div>
 
-      {showRpe ? (
+      {showRir ? (
         <div className="space-y-1">
           <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-            RPE {targetRpe != null ? `· hedef ${targetRpe}` : ""}
+            RIR {targetRir != null ? `· hedef ${targetRir}` : ""}
           </p>
           <Stepper
-            value={rpe}
-            placeholder={targetRpe != null ? String(targetRpe) : "—"}
+            value={rir}
+            placeholder={targetRir != null ? String(targetRir) : "—"}
             step={0.5}
             min={0}
             max={10}
             decimal
-            ariaLabel="RPE"
-            onChange={setRpe}
+            ariaLabel="RIR"
+            onChange={setRir}
           />
+          <p className="text-[10px] text-muted-foreground">
+            RIR = Yedekte kalan tekrar (0 = tam başarısızlık)
+          </p>
         </div>
       ) : null}
 

@@ -29,7 +29,7 @@ const logSetInput = sessionRef.extend({
   workoutExerciseId: uuidOrNull,
   weight: z.number().nullable(),
   reps: z.number().nullable(),
-  rpe: z.number().nullable(),
+  rir: z.number().nullable(),
   note: z.string().nullable(),
 });
 
@@ -93,7 +93,7 @@ export async function logSetAction(
       set_number: (count ?? 0) + 1,
       weight: d.weight,
       reps: d.reps == null ? null : Math.round(d.reps),
-      rpe: d.rpe,
+      rir: d.rir,
       notes: d.note,
     })
     .select("id")

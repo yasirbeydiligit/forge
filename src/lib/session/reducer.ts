@@ -5,7 +5,7 @@ export type ServerSet = {
   id: string;
   weight: number | null;
   reps: number | null;
-  rpe: number | null;
+  rir: number | null;
   note: string | null;
   completedAt: number;
 };
@@ -40,7 +40,7 @@ function serverSetToEntry(s: ServerSet): SetEntry {
     serverId: s.id,
     weight: s.weight,
     reps: s.reps,
-    rpe: s.rpe,
+    rir: s.rir,
     note: s.note,
     completedAt: s.completedAt,
     pr: false,
