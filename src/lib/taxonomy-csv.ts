@@ -21,11 +21,12 @@ export type ParsedExercise = {
   secondary: string[];
   alternatives: string[];
   category: string | null;
+  region: string | null;
   description: string | null;
   videoUrl: string | null;
 };
 
-const COLUMNS = 10;
+const COLUMNS = 11;
 
 const patterns = new Set<string>(MOVEMENT_PATTERNS);
 const equipment = new Set<string>(EQUIPMENT_TYPES);
@@ -73,6 +74,7 @@ export function parseTaxonomyCsv(text: string): ParsedExercise[] {
       secondaryRaw,
       altRaw,
       category,
+      region,
       description,
       videoUrl,
     ] = cells;
@@ -105,6 +107,7 @@ export function parseTaxonomyCsv(text: string): ParsedExercise[] {
       secondary: list(secondaryRaw),
       alternatives: list(altRaw),
       category: blank(category),
+      region: blank(region),
       description: blank(description),
       videoUrl: blank(videoUrl),
     });

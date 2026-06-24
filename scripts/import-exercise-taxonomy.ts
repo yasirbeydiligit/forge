@@ -92,6 +92,7 @@ async function main(): Promise<void> {
         slug: r.slug,
         name: r.name,
         category: r.category,
+        region: r.region,
         description: r.description,
         video_url: r.videoUrl,
         movement_pattern: r.movementPattern,
@@ -122,14 +123,20 @@ async function main(): Promise<void> {
   }[] = [];
   for (const r of rows) {
     const id = exId.get(r.slug)!;
-    const primarySet = new Set(r.primary);
+    // Dedup by muscle_function_id within the exercise (unique constraint);
+    // primary wins over secondary, and repeats inside a list are collapsed.
+    const seen = new Set<string>();
     for (const fn of r.primary) {
-      targets.push({ exercise_id: id, muscle_function_id: fnId.get(fn)!, role: "primary" });
+      const fid = fnId.get(fn)!;
+      if (seen.has(fid)) continue;
+      seen.add(fid);
+      targets.push({ exercise_id: id, muscle_function_id: fid, role: "primary" });
     }
-    // A function already counted as primary can't repeat (unique constraint).
     for (const fn of r.secondary) {
-      if (primarySet.has(fn)) continue;
-      targets.push({ exercise_id: id, muscle_function_id: fnId.get(fn)!, role: "secondary" });
+      const fid = fnId.get(fn)!;
+      if (seen.has(fid)) continue;
+      seen.add(fid);
+      targets.push({ exercise_id: id, muscle_function_id: fid, role: "secondary" });
     }
   }
   if (targets.length > 0) {
