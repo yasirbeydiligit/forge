@@ -212,14 +212,108 @@ export type Database = {
           },
         ]
       }
+      exercise_alternatives: {
+        Row: {
+          alternative_id: string
+          created_at: string
+          created_by: string | null
+          exercise_id: string
+          id: string
+          note: string | null
+        }
+        Insert: {
+          alternative_id: string
+          created_at?: string
+          created_by?: string | null
+          exercise_id: string
+          id?: string
+          note?: string | null
+        }
+        Update: {
+          alternative_id?: string
+          created_at?: string
+          created_by?: string | null
+          exercise_id?: string
+          id?: string
+          note?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exercise_alternatives_alternative_id_exercises_id_fk"
+            columns: ["alternative_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exercise_alternatives_created_by_profiles_id_fk"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exercise_alternatives_exercise_id_exercises_id_fk"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exercise_muscle_targets: {
+        Row: {
+          created_at: string
+          exercise_id: string
+          id: string
+          muscle_function_id: string
+          role: Database["public"]["Enums"]["exercise_muscle_role"]
+        }
+        Insert: {
+          created_at?: string
+          exercise_id: string
+          id?: string
+          muscle_function_id: string
+          role: Database["public"]["Enums"]["exercise_muscle_role"]
+        }
+        Update: {
+          created_at?: string
+          exercise_id?: string
+          id?: string
+          muscle_function_id?: string
+          role?: Database["public"]["Enums"]["exercise_muscle_role"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exercise_muscle_targets_exercise_id_exercises_id_fk"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exercise_muscle_targets_muscle_function_id_muscle_functions_id_"
+            columns: ["muscle_function_id"]
+            isOneToOne: false
+            referencedRelation: "muscle_functions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       exercises: {
         Row: {
           category: string | null
           created_at: string
           created_by: string | null
           description: string | null
+          equipment_type: Database["public"]["Enums"]["equipment_type"] | null
           id: string
+          is_system: boolean
+          movement_pattern:
+            | Database["public"]["Enums"]["movement_pattern"]
+            | null
           name: string
+          slug: string | null
           video_url: string | null
         }
         Insert: {
@@ -227,8 +321,14 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          equipment_type?: Database["public"]["Enums"]["equipment_type"] | null
           id?: string
+          is_system?: boolean
+          movement_pattern?:
+            | Database["public"]["Enums"]["movement_pattern"]
+            | null
           name: string
+          slug?: string | null
           video_url?: string | null
         }
         Update: {
@@ -236,8 +336,14 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          equipment_type?: Database["public"]["Enums"]["equipment_type"] | null
           id?: string
+          is_system?: boolean
+          movement_pattern?:
+            | Database["public"]["Enums"]["movement_pattern"]
+            | null
           name?: string
+          slug?: string | null
           video_url?: string | null
         }
         Relationships: [
@@ -785,6 +891,68 @@ export type Database = {
           },
         ]
       }
+      muscle_functions: {
+        Row: {
+          created_at: string
+          id: string
+          muscle_id: string
+          name_technical: string | null
+          name_tr: string
+          slug: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          muscle_id: string
+          name_technical?: string | null
+          name_tr: string
+          slug: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          muscle_id?: string
+          name_technical?: string | null
+          name_tr?: string
+          slug?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "muscle_functions_muscle_id_muscles_id_fk"
+            columns: ["muscle_id"]
+            isOneToOne: false
+            referencedRelation: "muscles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      muscles: {
+        Row: {
+          created_at: string
+          id: string
+          name_latin: string | null
+          name_tr: string
+          region: Database["public"]["Enums"]["muscle_region"]
+          slug: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name_latin?: string | null
+          name_tr: string
+          region: Database["public"]["Enums"]["muscle_region"]
+          slug: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name_latin?: string | null
+          name_tr?: string
+          region?: Database["public"]["Enums"]["muscle_region"]
+          slug?: string
+        }
+        Relationships: []
+      }
       nutrition_targets: {
         Row: {
           athlete_id: string
@@ -1015,11 +1183,48 @@ export type Database = {
           section_title: string
         }[]
       }
+      suggest_exercise_alternatives: {
+        Args: { p_exercise: string }
+        Returns: {
+          equipment_type: Database["public"]["Enums"]["equipment_type"]
+          exercise_id: string
+          movement_pattern: Database["public"]["Enums"]["movement_pattern"]
+          name: string
+          shared_primary: number
+          shared_secondary: number
+        }[]
+      }
     }
     Enums: {
       document_status: "pending" | "processing" | "ready" | "failed"
       enrollment_status: "active" | "paused" | "completed"
+      equipment_type:
+        | "barbell"
+        | "dumbbell"
+        | "machine"
+        | "cable"
+        | "bodyweight"
+        | "kettlebell"
+        | "band"
+        | "smith"
+        | "ez_bar"
+        | "trap_bar"
+        | "other"
+      exercise_muscle_role: "primary" | "secondary"
       library_source_type: "paper" | "book" | "handout"
+      movement_pattern:
+        | "push_horizontal"
+        | "push_vertical"
+        | "pull_horizontal"
+        | "pull_vertical"
+        | "squat"
+        | "hinge"
+        | "lunge"
+        | "isolation"
+        | "carry"
+        | "core"
+        | "rotation"
+      muscle_region: "upper" | "lower" | "core"
       user_role: "coach" | "athlete"
     }
     CompositeTypes: {
@@ -1150,7 +1355,35 @@ export const Constants = {
     Enums: {
       document_status: ["pending", "processing", "ready", "failed"],
       enrollment_status: ["active", "paused", "completed"],
+      equipment_type: [
+        "barbell",
+        "dumbbell",
+        "machine",
+        "cable",
+        "bodyweight",
+        "kettlebell",
+        "band",
+        "smith",
+        "ez_bar",
+        "trap_bar",
+        "other",
+      ],
+      exercise_muscle_role: ["primary", "secondary"],
       library_source_type: ["paper", "book", "handout"],
+      movement_pattern: [
+        "push_horizontal",
+        "push_vertical",
+        "pull_horizontal",
+        "pull_vertical",
+        "squat",
+        "hinge",
+        "lunge",
+        "isolation",
+        "carry",
+        "core",
+        "rotation",
+      ],
+      muscle_region: ["upper", "lower", "core"],
       user_role: ["coach", "athlete"],
     },
   },
