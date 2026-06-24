@@ -154,6 +154,8 @@ export const exercises = pgTable(
     // Legacy free-text grouping label, kept for existing UI; the taxonomy below
     // (movement_pattern + muscle targets) is the real classification.
     category: text("category"),
+    // Optional finer sub-region label (e.g. "Üst Göğüs", "Arka Omuz"), free text.
+    region: text("region"),
     description: text("description"),
     videoUrl: text("video_url"),
     movementPattern: movementPattern("movement_pattern"),

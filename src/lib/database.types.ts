@@ -313,6 +313,7 @@ export type Database = {
             | Database["public"]["Enums"]["movement_pattern"]
             | null
           name: string
+          region: string | null
           slug: string | null
           video_url: string | null
         }
@@ -328,6 +329,7 @@ export type Database = {
             | Database["public"]["Enums"]["movement_pattern"]
             | null
           name: string
+          region?: string | null
           slug?: string | null
           video_url?: string | null
         }
@@ -343,6 +345,7 @@ export type Database = {
             | Database["public"]["Enums"]["movement_pattern"]
             | null
           name?: string
+          region?: string | null
           slug?: string | null
           video_url?: string | null
         }
