@@ -13,6 +13,7 @@ const payload: LogSetPayload = {
   reps: 5,
   rir: null,
   note: null,
+  performedAt: "2026-06-18T10:00:00.000Z",
 };
 
 function logOp(localId: string): QueueOp {

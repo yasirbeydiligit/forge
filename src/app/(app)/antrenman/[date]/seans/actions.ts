@@ -31,6 +31,8 @@ const logSetInput = sessionRef.extend({
   reps: z.number().nullable(),
   rir: z.number().nullable(),
   note: z.string().nullable(),
+  // ISO completion time captured on the client; optional for backward-compat.
+  performedAt: z.string().datetime().nullable().optional(),
 });
 
 const finishInput = sessionRef.extend({
@@ -95,6 +97,7 @@ export async function logSetAction(
       reps: d.reps == null ? null : Math.round(d.reps),
       rir: d.rir,
       notes: d.note,
+      performed_at: d.performedAt ?? null,
     })
     .select("id")
     .single();

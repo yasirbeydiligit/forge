@@ -246,6 +246,11 @@ export function useSessionPlayer(data: PlayerData) {
           ? crypto.randomUUID()
           : `l-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
+      // Stamp the completion time once and reuse it for both local state and the
+      // server payload, so the recorded performed_at is the real workout time
+      // even when the set syncs much later (offline).
+      const completedAt = Date.now();
+
       dispatch({
         type: "COMPLETE_SET",
         exerciseIndex,
@@ -256,7 +261,7 @@ export function useSessionPlayer(data: PlayerData) {
           reps: input.reps,
           rir: input.rir,
           note: input.note,
-          completedAt: Date.now(),
+          completedAt,
           pr,
         },
       });
@@ -274,6 +279,7 @@ export function useSessionPlayer(data: PlayerData) {
           reps: input.reps,
           rir: input.rir,
           note: input.note,
+          performedAt: new Date(completedAt).toISOString(),
         },
       });
       return pr;

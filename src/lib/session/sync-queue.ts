@@ -16,6 +16,8 @@ export type LogSetPayload = {
   reps: number | null;
   rir: number | null;
   note: string | null;
+  /** ISO time the set was completed on the client (survives offline queueing). */
+  performedAt: string;
 };
 
 export type QueueOp =
