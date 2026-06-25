@@ -29,6 +29,9 @@ import { formatNumber, formatRepRange, formatRest } from "@/lib/format";
 import { sessionTotals } from "@/lib/session/totals";
 import { cn } from "@/lib/utils";
 
+import type { SessionReport } from "@/lib/reports/session-report";
+
+import { getSessionReportAction } from "./actions";
 import { ExerciseHistory } from "./exercise-history";
 import type { PlayerData } from "./player-data";
 import { RestTimer } from "./rest-timer";
@@ -502,6 +505,30 @@ function FinishView({
   const durationMs =
     state.startedAt != null ? (state.finishedAt ?? Date.now()) - state.startedAt : 0;
 
+  // Fetch the server-authoritative report once the set queue has drained, so it
+  // reflects every synced set. Falls back to the client recap while loading /
+  // offline.
+  const [report, setReport] = useState<SessionReport | null>(null);
+  const [reportLoading, setReportLoading] = useState(true);
+  const synced = player.pendingCount === 0;
+  useEffect(() => {
+    if (!synced) return;
+    let cancelled = false;
+    setReportLoading(true);
+    getSessionReportAction({ date: data.date, assignmentId: data.assignmentId })
+      .then((res) => {
+        if (cancelled) return;
+        if ("report" in res) setReport(res.report);
+        setReportLoading(false);
+      })
+      .catch(() => {
+        if (!cancelled) setReportLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [synced, data.date, data.assignmentId]);
+
   const exercises: SummaryExerciseDetail[] = state.exercises
     .map((ex, i) => {
       const meta = data.exercises[i];
@@ -540,6 +567,8 @@ function FinishView({
         prCount={totals.prCount}
         prExercises={prExercises}
         exercises={exercises}
+        report={report}
+        reportLoading={reportLoading}
         insights={data.insights}
         initialNote={data.initialNote}
         onExit={onExit}

@@ -1,11 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft, Check, Loader2, Send, Sparkles } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowUp,
+  Check,
+  Loader2,
+  Minus,
+  Send,
+  Sparkles,
+} from "lucide-react";
 
 import { InsightNote } from "@/components/library/insight-note";
 import { MarginNote } from "@/components/lab/lab";
 import { formatNumber } from "@/lib/format";
+import type { Direction, SessionReport } from "@/lib/reports/session-report";
 import type { AthleteInsight } from "@/lib/rag/insights-server";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +27,123 @@ function fmtDuration(ms: number): string {
   const m = Math.floor((total % 3600) / 60);
   if (h > 0) return `${h} sa ${m} dk`;
   return `${m} dk`;
+}
+
+/** Up/flat/down indicator — icon + Turkish word + colour (never colour-only). */
+function DirectionMark({ dir, label }: { dir: Direction | null; label: string }) {
+  if (dir == null) return null;
+  const Icon = dir === "up" ? ArrowUp : dir === "down" ? ArrowDown : Minus;
+  const tone =
+    dir === "up" ? "text-lab-green" : dir === "down" ? "text-lab-amber" : "text-paper-muted";
+  const word = dir === "up" ? "arttı" : dir === "down" ? "azaldı" : "sabit";
+  return (
+    <span className={cn("inline-flex items-center gap-0.5 text-[10px] font-medium", tone)}>
+      <Icon className="size-3" aria-hidden />
+      {label} {word}
+    </span>
+  );
+}
+
+/**
+ * Server-computed report sections: muscle/function set distribution with
+ * approximate time, and the movement summary with up/flat/down deltas and
+ * typed PR badges (solid green = strength PR, outline = RIR PR).
+ */
+function ReportSections({ report }: { report: SessionReport }) {
+  const muscles = report.muscles.filter((m) => m.primarySets > 0 || m.secondarySets > 0);
+
+  return (
+    <>
+      {muscles.length > 0 ? (
+        <section className="space-y-2">
+          <p className="text-label text-muted-foreground">Kas dağılımı (set)</p>
+          <div className="space-y-px overflow-hidden rounded-2xl border border-paper-border bg-paper-border">
+            {muscles.map((m) => (
+              <div key={m.muscleSlug} className="bg-paper p-3">
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="font-serif text-[15px] font-semibold text-paper-foreground">
+                    {m.muscleNameTr}
+                    <span className="ml-2 font-mono text-xs tabular-nums text-lab-green">
+                      {m.primarySets} set
+                    </span>
+                    {m.secondarySets > 0 ? (
+                      <span className="ml-1 font-mono text-[11px] tabular-nums text-paper-muted">
+                        +{m.secondarySets} ikincil
+                      </span>
+                    ) : null}
+                  </p>
+                  {m.activeMs > 0 ? (
+                    <span className="shrink-0 font-mono text-[11px] tabular-nums text-paper-muted">
+                      ~{fmtDuration(m.activeMs)}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 font-mono text-[11px] tabular-nums text-paper-muted">
+                  {m.functions.map((f) => (
+                    <span key={f.functionSlug}>
+                      {f.functionNameTr} · {f.primarySets}
+                      {f.secondarySets > 0 ? `+${f.secondarySets}` : ""}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {report.exercises.length > 0 ? (
+        <section className="space-y-2">
+          <p className="text-label text-muted-foreground">Hareket özeti</p>
+          <div className="space-y-px overflow-hidden rounded-2xl border border-paper-border bg-paper-border">
+            {report.exercises.map((ex) => (
+              <div key={ex.exerciseId} className="bg-paper p-3">
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="truncate font-serif text-[15px] font-semibold text-paper-foreground">
+                    {ex.exerciseName}
+                  </p>
+                  <span className="flex shrink-0 items-center gap-2">
+                    <DirectionMark dir={ex.weight} label="kg" />
+                    <DirectionMark dir={ex.reps} label="tekrar" />
+                  </span>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {ex.sets.map((s, i) => {
+                    const strengthPr = s.prType != null && s.prType !== "rir";
+                    const rirPr = s.prType === "rir";
+                    return (
+                      <span
+                        key={i}
+                        className={cn(
+                          "inline-flex items-baseline gap-1 rounded-md border px-1.5 py-1 font-mono text-xs tabular-nums",
+                          strengthPr
+                            ? "border-lab-green/30 bg-lab-green/10 text-paper-foreground"
+                            : "border-paper-border bg-paper-foreground/[0.03] text-paper-foreground",
+                        )}
+                      >
+                        <span className="font-semibold">{formatNumber(s.weight)}</span>
+                        <span className="text-paper-muted">×</span>
+                        <span className="font-semibold">{s.reps ?? "—"}</span>
+                        {strengthPr ? (
+                          <span className="text-[9px] font-semibold uppercase tracking-wider text-lab-green">
+                            PR
+                          </span>
+                        ) : rirPr ? (
+                          <span className="rounded-sm border border-lab-green/50 px-1 text-[9px] font-semibold uppercase tracking-wider text-lab-green">
+                            RIR
+                          </span>
+                        ) : null}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+    </>
+  );
 }
 
 export type SummarySet = {
@@ -44,6 +171,8 @@ export function SessionSummary({
   prCount,
   prExercises,
   exercises,
+  report,
+  reportLoading,
   insights,
   initialNote,
   onExit,
@@ -56,6 +185,9 @@ export function SessionSummary({
   prCount: number;
   prExercises: SummaryExercise[];
   exercises: SummaryExerciseDetail[];
+  /** Server-computed authoritative report; null/undefined falls back to the client recap. */
+  report?: SessionReport | null;
+  reportLoading?: boolean;
   insights: AthleteInsight[];
   initialNote: string;
   onExit: (note: string) => void;
@@ -63,6 +195,8 @@ export function SessionSummary({
 }) {
   const [note, setNote] = useState(initialNote);
   const [shareState, setShareState] = useState<"idle" | "sharing" | "done">("idle");
+
+  const hasReport = !!report && report.totalSets > 0;
 
   const share = async () => {
     setShareState("sharing");
@@ -99,8 +233,21 @@ export function SessionSummary({
         </MarginNote>
       ) : null}
 
-      {/* Per-exercise breakdown with set-by-set comparison */}
-      {exercises.length > 0 ? (
+      {report && report.rirPrCount > 0 ? (
+        <MarginNote label="RIR rekoru" accent="blue">
+          {report.rirPrCount} sette aynı işi daha az yedekle (daha düşük RIR) yaptın — efor
+          kapasitesi artıyor.
+        </MarginNote>
+      ) : null}
+
+      {/* Server-authoritative report; falls back to the client recap offline. */}
+      {hasReport ? (
+        <ReportSections report={report!} />
+      ) : reportLoading ? (
+        <div className="flex items-center justify-center gap-2 py-4 text-sm text-paper-muted">
+          <Loader2 className="size-4 animate-spin" /> Rapor hazırlanıyor…
+        </div>
+      ) : exercises.length > 0 ? (
         <section className="space-y-2">
           <p className="text-label text-muted-foreground">Egzersizler</p>
           <div className="space-y-px overflow-hidden rounded-2xl border border-paper-border bg-paper-border">

@@ -4,8 +4,10 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireProfile } from "@/lib/auth";
+import type { SessionReport } from "@/lib/reports/session-report";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ensureSession } from "../../session-helpers";
+import { loadSessionReport } from "./report-loader";
 
 /**
  * JSON server actions for the live session player. These return values (unlike
@@ -153,6 +155,20 @@ export async function finishSessionAction(
 
   revalidatePath(`/antrenman/${d.date}`);
   return { ok: true };
+}
+
+export async function getSessionReportAction(
+  raw: { date: string; assignmentId: string },
+): Promise<{ report: SessionReport } | { error: string }> {
+  const profile = await requireProfile();
+  const date = z.string().regex(dateRe).safeParse(raw.date);
+  const assignmentId = z.string().uuid().safeParse(raw.assignmentId);
+  if (!date.success || !assignmentId.success) return { error: "invalid" };
+
+  const supabase = await createSupabaseServerClient();
+  const report = await loadSessionReport(supabase, profile.id, date.data, assignmentId.data);
+  if (!report) return { error: "no_report" };
+  return { report };
 }
 
 export async function shareToFeedAction(
