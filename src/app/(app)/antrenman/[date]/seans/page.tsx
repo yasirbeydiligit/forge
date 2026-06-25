@@ -122,13 +122,13 @@ export default async function SessionPlayerPage({
         restSeconds: we.rest_seconds,
       },
       stats: {
-        bestEst1RM: stats.bestEst1RM,
         allTimePr: stats.allTimePr,
         allTimePrDate: stats.allTimePrDate,
         prevSessionWeights: stats.prevSessionWeights,
         prevSessionSets: stats.prevSessionSets,
-        volume4w: stats.volume4w,
+        volumeSets4w: stats.volumeSets4w,
         avgRir4w: stats.avgRir4w,
+        prHistory: stats.prHistory,
         recentSessions: stats.recentSessions.map((s) => ({ date: s.date, scheme: s.scheme })),
         trendPoints: stats.trendPoints,
         trendDelta: stats.trendDelta,
@@ -139,7 +139,9 @@ export default async function SessionPlayerPage({
         reps: s.reps,
         rir: s.rir != null ? Number(s.rir) : null,
         note: s.notes,
-        completedAt: new Date(s.created_at).getTime(),
+        // Prefer the client-stamped performed_at; fall back to insert time for
+        // legacy rows logged before performed_at existed.
+        completedAt: new Date(s.performed_at ?? s.created_at).getTime(),
       })),
     };
   });

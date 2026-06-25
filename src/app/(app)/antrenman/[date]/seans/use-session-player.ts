@@ -240,11 +240,26 @@ export function useSessionPlayer(data: PlayerData) {
       const ex = stateRef.current.exercises[exerciseIndex];
       const meta = data.exercises[exerciseIndex];
       if (!ex || !meta) return false;
-      const pr = detectPr(meta.stats, { weight: input.weight, reps: input.reps });
+      // History = the exercise's all-time PR frontier plus the sets already done
+      // this session, so progressive sets within one workout can also be PRs.
+      const history = [
+        ...meta.stats.prHistory,
+        ...ex.sets.map((s) => ({ weight: s.weight, reps: s.reps, rir: s.rir })),
+      ];
+      const pr = detectPr(history, {
+        weight: input.weight,
+        reps: input.reps,
+        rir: input.rir,
+      });
       const localId =
         typeof crypto !== "undefined" && crypto.randomUUID
           ? crypto.randomUUID()
           : `l-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+      // Stamp the completion time once and reuse it for both local state and the
+      // server payload, so the recorded performed_at is the real workout time
+      // even when the set syncs much later (offline).
+      const completedAt = Date.now();
 
       dispatch({
         type: "COMPLETE_SET",
@@ -256,7 +271,7 @@ export function useSessionPlayer(data: PlayerData) {
           reps: input.reps,
           rir: input.rir,
           note: input.note,
-          completedAt: Date.now(),
+          completedAt,
           pr,
         },
       });
@@ -274,6 +289,7 @@ export function useSessionPlayer(data: PlayerData) {
           reps: input.reps,
           rir: input.rir,
           note: input.note,
+          performedAt: new Date(completedAt).toISOString(),
         },
       });
       return pr;

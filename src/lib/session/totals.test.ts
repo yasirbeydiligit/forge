@@ -17,43 +17,47 @@ function set(overrides: Partial<SetEntry> = {}): SetEntry {
   };
 }
 
-describe("detectPr", () => {
-  const stats = { allTimePr: 100, bestEst1RM: 112.5, prevSessionWeights: [] };
+describe("detectPr (evaluatePR wrapper)", () => {
+  const history = [{ weight: 100, reps: 5, rir: null }];
 
-  it("flags a heavier top-set than the all-time weight PR", () => {
-    expect(detectPr(stats, { weight: 102.5, reps: 3 })).toBe(true);
+  it("flags more reps at the same weight", () => {
+    expect(detectPr(history, { weight: 100, reps: 6, rir: null })).toBe(true);
   });
 
-  it("flags a set whose estimated 1RM beats the best, even at lower weight", () => {
-    // 95 x 6 -> Brzycki ~110.3, below 112.5; 95 x 8 -> ~117.9, beats it.
-    expect(detectPr(stats, { weight: 95, reps: 8 })).toBe(true);
-    expect(detectPr(stats, { weight: 95, reps: 6 })).toBe(false);
+  it("flags a Rule B trade-off (heavier, one fewer rep)", () => {
+    expect(
+      detectPr([{ weight: 100, reps: 4, rir: null }], { weight: 102.5, reps: 3, rir: null }),
+    ).toBe(true);
   });
 
   it("does not flag matching or lighter work", () => {
-    expect(detectPr(stats, { weight: 100, reps: 5 })).toBe(false);
-    expect(detectPr(stats, { weight: 90, reps: 5 })).toBe(false);
-  });
-
-  it("does not flag when weight or reps are missing", () => {
-    expect(detectPr(stats, { weight: null, reps: 5 })).toBe(false);
-    expect(detectPr(stats, { weight: 120, reps: null })).toBe(false);
+    expect(detectPr(history, { weight: 100, reps: 5, rir: null })).toBe(false);
+    expect(detectPr(history, { weight: 90, reps: 5, rir: null })).toBe(false);
   });
 
   it("does not flag the first-ever set (no prior history)", () => {
+    expect(detectPr([], { weight: 60, reps: 5, rir: null })).toBe(false);
+  });
+
+  it("does not flag when weight or reps are missing", () => {
+    expect(detectPr(history, { weight: null, reps: 5, rir: null })).toBe(false);
+    expect(detectPr(history, { weight: 120, reps: null, rir: null })).toBe(false);
+  });
+
+  it("flags a RIR PR (same weight+reps, lower RIR)", () => {
     expect(
-      detectPr({ allTimePr: null, bestEst1RM: null }, { weight: 60, reps: 5 }),
-    ).toBe(false);
+      detectPr([{ weight: 100, reps: 5, rir: 3 }], { weight: 100, reps: 5, rir: 1 }),
+    ).toBe(true);
   });
 });
 
 describe("sessionTotals", () => {
-  it("sums volume, counts sets and PRs across exercises", () => {
+  it("counts sets and PRs across exercises (volume is set count, not tonnage)", () => {
     const exercises: ExerciseState[] = [
       {
         workoutExerciseId: "we1",
         exerciseId: "e1",
-        sets: [set({ weight: 100, reps: 5, pr: true }), set({ weight: 100, reps: 5 })],
+        sets: [set({ pr: true }), set()],
       },
       {
         workoutExerciseId: "we2",
@@ -61,21 +65,17 @@ describe("sessionTotals", () => {
         sets: [set({ weight: 50, reps: 10 })],
       },
     ];
-    expect(sessionTotals(exercises)).toEqual({
-      setCount: 3,
-      volume: 100 * 5 + 100 * 5 + 50 * 10,
-      prCount: 1,
-    });
+    expect(sessionTotals(exercises)).toEqual({ setCount: 3, prCount: 1 });
   });
 
-  it("ignores sets missing weight or reps in the volume", () => {
+  it("counts every completed set regardless of missing weight/reps", () => {
     const exercises: ExerciseState[] = [
       {
         workoutExerciseId: "we1",
         exerciseId: "e1",
-        sets: [set({ weight: null, reps: 5 }), set({ weight: 80, reps: null }), set({ weight: 80, reps: 3 })],
+        sets: [set({ weight: null }), set({ reps: null }), set()],
       },
     ];
-    expect(sessionTotals(exercises)).toMatchObject({ setCount: 3, volume: 240 });
+    expect(sessionTotals(exercises)).toEqual({ setCount: 3, prCount: 0 });
   });
 });

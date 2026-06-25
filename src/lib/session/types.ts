@@ -16,13 +16,6 @@ export type ExerciseTarget = {
   restSeconds: number | null;
 };
 
-/** The historical-context block (estimated 1RM, PR, recent sessions, trend). */
-export type ExerciseStatsLite = {
-  bestEst1RM: number | null;
-  allTimePr: number | null;
-  prevSessionWeights: number[];
-};
-
 /** A completed, logged set held in client state. */
 export type SetEntry = {
   /** Client-generated id, stable across reconcile (used as React key + queue key). */
@@ -35,7 +28,7 @@ export type SetEntry = {
   note: string | null;
   /** ms epoch when the set was marked complete. */
   completedAt: number;
-  /** True when this set beat the all-time weight PR or estimated-1RM at completion. */
+  /** True when evaluatePR flagged this set as a PR at completion (observed). */
   pr: boolean;
 };
 

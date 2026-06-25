@@ -1,11 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft, Check, Loader2, Send, Sparkles } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowUp,
+  Check,
+  Loader2,
+  Minus,
+  Send,
+  Sparkles,
+} from "lucide-react";
 
 import { InsightNote } from "@/components/library/insight-note";
 import { MarginNote } from "@/components/lab/lab";
 import { formatNumber } from "@/lib/format";
+import type { Direction, SessionReport } from "@/lib/reports/session-report";
 import type { AthleteInsight } from "@/lib/rag/insights-server";
 import { cn } from "@/lib/utils";
 
@@ -19,6 +29,123 @@ function fmtDuration(ms: number): string {
   return `${m} dk`;
 }
 
+/** Up/flat/down indicator — icon + Turkish word + colour (never colour-only). */
+function DirectionMark({ dir, label }: { dir: Direction | null; label: string }) {
+  if (dir == null) return null;
+  const Icon = dir === "up" ? ArrowUp : dir === "down" ? ArrowDown : Minus;
+  const tone =
+    dir === "up" ? "text-lab-green" : dir === "down" ? "text-lab-amber" : "text-paper-muted";
+  const word = dir === "up" ? "arttı" : dir === "down" ? "azaldı" : "sabit";
+  return (
+    <span className={cn("inline-flex items-center gap-0.5 text-[10px] font-medium", tone)}>
+      <Icon className="size-3" aria-hidden />
+      {label} {word}
+    </span>
+  );
+}
+
+/**
+ * Server-computed report sections: muscle/function set distribution with
+ * approximate time, and the movement summary with up/flat/down deltas and
+ * typed PR badges (solid green = strength PR, outline = RIR PR).
+ */
+function ReportSections({ report }: { report: SessionReport }) {
+  const muscles = report.muscles.filter((m) => m.primarySets > 0 || m.secondarySets > 0);
+
+  return (
+    <>
+      {muscles.length > 0 ? (
+        <section className="space-y-2">
+          <p className="text-label text-muted-foreground">Kas dağılımı (set)</p>
+          <div className="space-y-px overflow-hidden rounded-2xl border border-paper-border bg-paper-border">
+            {muscles.map((m) => (
+              <div key={m.muscleSlug} className="bg-paper p-3">
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="font-serif text-[15px] font-semibold text-paper-foreground">
+                    {m.muscleNameTr}
+                    <span className="ml-2 font-mono text-xs tabular-nums text-lab-green">
+                      {m.primarySets} set
+                    </span>
+                    {m.secondarySets > 0 ? (
+                      <span className="ml-1 font-mono text-[11px] tabular-nums text-paper-muted">
+                        +{m.secondarySets} ikincil
+                      </span>
+                    ) : null}
+                  </p>
+                  {m.activeMs > 0 ? (
+                    <span className="shrink-0 font-mono text-[11px] tabular-nums text-paper-muted">
+                      ~{fmtDuration(m.activeMs)}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 font-mono text-[11px] tabular-nums text-paper-muted">
+                  {m.functions.map((f) => (
+                    <span key={f.functionSlug}>
+                      {f.functionNameTr} · {f.primarySets}
+                      {f.secondarySets > 0 ? `+${f.secondarySets}` : ""}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {report.exercises.length > 0 ? (
+        <section className="space-y-2">
+          <p className="text-label text-muted-foreground">Hareket özeti</p>
+          <div className="space-y-px overflow-hidden rounded-2xl border border-paper-border bg-paper-border">
+            {report.exercises.map((ex) => (
+              <div key={ex.exerciseId} className="bg-paper p-3">
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="truncate font-serif text-[15px] font-semibold text-paper-foreground">
+                    {ex.exerciseName}
+                  </p>
+                  <span className="flex shrink-0 items-center gap-2">
+                    <DirectionMark dir={ex.weight} label="kg" />
+                    <DirectionMark dir={ex.reps} label="tekrar" />
+                  </span>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {ex.sets.map((s, i) => {
+                    const strengthPr = s.prType != null && s.prType !== "rir";
+                    const rirPr = s.prType === "rir";
+                    return (
+                      <span
+                        key={i}
+                        className={cn(
+                          "inline-flex items-baseline gap-1 rounded-md border px-1.5 py-1 font-mono text-xs tabular-nums",
+                          strengthPr
+                            ? "border-lab-green/30 bg-lab-green/10 text-paper-foreground"
+                            : "border-paper-border bg-paper-foreground/[0.03] text-paper-foreground",
+                        )}
+                      >
+                        <span className="font-semibold">{formatNumber(s.weight)}</span>
+                        <span className="text-paper-muted">×</span>
+                        <span className="font-semibold">{s.reps ?? "—"}</span>
+                        {strengthPr ? (
+                          <span className="text-[9px] font-semibold uppercase tracking-wider text-lab-green">
+                            PR
+                          </span>
+                        ) : rirPr ? (
+                          <span className="rounded-sm border border-lab-green/50 px-1 text-[9px] font-semibold uppercase tracking-wider text-lab-green">
+                            RIR
+                          </span>
+                        ) : null}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+    </>
+  );
+}
+
 export type SummarySet = {
   weight: number | null;
   reps: number | null;
@@ -29,8 +156,8 @@ export type SummarySet = {
 export type SummaryExerciseDetail = {
   name: string;
   sets: SummarySet[];
-  volume: number;
-  prevVolume: number | null;
+  setCount: number;
+  prevSetCount: number | null;
 };
 
 /** Lightweight PR list shape kept for the PR margin note. */
@@ -39,13 +166,13 @@ export type SummaryExercise = { name: string; prSets: { weight: number | null; r
 export function SessionSummary({
   workoutName,
   durationMs,
-  volume,
-  prevVolume,
   setCount,
   totalReps,
   prCount,
   prExercises,
   exercises,
+  report,
+  reportLoading,
   insights,
   initialNote,
   onExit,
@@ -53,13 +180,14 @@ export function SessionSummary({
 }: {
   workoutName: string;
   durationMs: number;
-  volume: number;
-  prevVolume: number | null;
   setCount: number;
   totalReps: number;
   prCount: number;
   prExercises: SummaryExercise[];
   exercises: SummaryExerciseDetail[];
+  /** Server-computed authoritative report; null/undefined falls back to the client recap. */
+  report?: SessionReport | null;
+  reportLoading?: boolean;
   insights: AthleteInsight[];
   initialNote: string;
   onExit: (note: string) => void;
@@ -68,12 +196,12 @@ export function SessionSummary({
   const [note, setNote] = useState(initialNote);
   const [shareState, setShareState] = useState<"idle" | "sharing" | "done">("idle");
 
-  const volumeDelta = prevVolume != null ? volume - prevVolume : null;
+  const hasReport = !!report && report.totalSets > 0;
 
   const share = async () => {
     setShareState("sharing");
     const prLine = prCount > 0 ? ` · ${prCount} PR` : "";
-    const body = `${workoutName} tamamlandı — ${fmtDuration(durationMs)}, ${volume.toLocaleString("tr-TR")} kg hacim, ${setCount} set${prLine}.`;
+    const body = `${workoutName} tamamlandı — ${fmtDuration(durationMs)}, ${setCount} set hacim${prLine}.`;
     const res = await shareToFeedAction({ body });
     setShareState("error" in res ? "idle" : "done");
   };
@@ -85,16 +213,11 @@ export function SessionSummary({
         <h1 className="text-display mt-1 text-lab-ink">{workoutName}</h1>
       </div>
 
-      {/* Hero metrics */}
+      {/* Hero metrics — "hacim" is set count in this product, never tonnage. */}
       <div className="grid grid-cols-3 gap-px overflow-hidden rounded-2xl border border-paper-border bg-paper-border">
         <Metric label="Süre" value={fmtDuration(durationMs)} />
-        <Metric
-          label="Hacim"
-          value={volume.toLocaleString("tr-TR")}
-          unit="kg"
-          delta={volumeDelta}
-        />
-        <Metric label="Set" value={String(setCount)} sub={`${totalReps} tekrar`} />
+        <Metric label="Hacim" value={String(setCount)} unit="set" />
+        <Metric label="Tekrar" value={String(totalReps)} sub={`${prCount} PR`} />
       </div>
 
       {prCount > 0 ? (
@@ -110,13 +233,26 @@ export function SessionSummary({
         </MarginNote>
       ) : null}
 
-      {/* Per-exercise breakdown with set-by-set comparison */}
-      {exercises.length > 0 ? (
+      {report && report.rirPrCount > 0 ? (
+        <MarginNote label="RIR rekoru" accent="blue">
+          {report.rirPrCount} sette aynı işi daha az yedekle (daha düşük RIR) yaptın — efor
+          kapasitesi artıyor.
+        </MarginNote>
+      ) : null}
+
+      {/* Server-authoritative report; falls back to the client recap offline. */}
+      {hasReport ? (
+        <ReportSections report={report!} />
+      ) : reportLoading ? (
+        <div className="flex items-center justify-center gap-2 py-4 text-sm text-paper-muted">
+          <Loader2 className="size-4 animate-spin" /> Rapor hazırlanıyor…
+        </div>
+      ) : exercises.length > 0 ? (
         <section className="space-y-2">
           <p className="text-label text-muted-foreground">Egzersizler</p>
           <div className="space-y-px overflow-hidden rounded-2xl border border-paper-border bg-paper-border">
             {exercises.map((ex) => {
-              const vDelta = ex.prevVolume != null ? ex.volume - ex.prevVolume : null;
+              const sDelta = ex.prevSetCount != null ? ex.setCount - ex.prevSetCount : null;
               return (
                 <div key={ex.name} className="bg-paper p-3">
                   <div className="flex items-baseline justify-between gap-3">
@@ -124,12 +260,12 @@ export function SessionSummary({
                       {ex.name}
                     </p>
                     <span className="shrink-0 font-mono text-[11px] tabular-nums text-paper-muted">
-                      {ex.volume.toLocaleString("tr-TR")} kg
-                      {vDelta != null && vDelta !== 0 ? (
-                        <span className={vDelta > 0 ? "text-lab-green" : "text-lab-amber"}>
+                      {ex.setCount} set
+                      {sDelta != null && sDelta !== 0 ? (
+                        <span className={sDelta > 0 ? "text-lab-green" : "text-lab-amber"}>
                           {" "}
-                          {vDelta > 0 ? "+" : ""}
-                          {Math.round(vDelta).toLocaleString("tr-TR")}
+                          {sDelta > 0 ? "+" : ""}
+                          {sDelta}
                         </span>
                       ) : null}
                     </span>
