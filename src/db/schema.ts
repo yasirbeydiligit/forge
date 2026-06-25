@@ -466,6 +466,9 @@ export const logSets = pgTable(
     // RIR (Reps in Reserve), 0–10, 0.5 steps; always optional. Replaces RPE.
     rir: numeric("rir", { precision: 3, scale: 1 }),
     notes: text("notes"),
+    // Client-stamped time the set was completed (for accurate rest/time-distribution
+    // reports). Survives offline queueing; legacy rows fall back to created_at.
+    performedAt: timestamp("performed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

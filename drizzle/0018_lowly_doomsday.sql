@@ -1,0 +1,1 @@
+ALTER TABLE "log_sets" ADD COLUMN "performed_at" timestamp with time zone;
