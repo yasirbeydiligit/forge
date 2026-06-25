@@ -57,6 +57,35 @@ describe("buildSessionReport — muscle/function distribution", () => {
     expect(triceps.primarySets).toBe(0);
   });
 
+  it("counts a set once per muscle even when it hits two of the muscle's functions", () => {
+    // A leg exercise targeting hamstrings via BOTH knee-flexion and hip-extension:
+    // 1 set = 1 set for the hamstrings muscle, but 1 set for each function.
+    const hamTargets: ReportSet["targets"] = [
+      {
+        muscleSlug: "hamstrings",
+        muscleNameTr: "Arka bacak",
+        functionSlug: "hamstrings-knee-flexion",
+        functionNameTr: "Diz fleksiyonu",
+        role: "primary",
+      },
+      {
+        muscleSlug: "hamstrings",
+        muscleNameTr: "Arka bacak",
+        functionSlug: "hamstrings-hip-extension",
+        functionNameTr: "Kalça ekstansiyonu",
+        role: "primary",
+      },
+    ];
+    const report = buildSessionReport({
+      sets: [set({ targets: hamTargets }), set({ targets: hamTargets })],
+      histories: noHistory,
+    });
+    const ham = report.muscles.find((m) => m.muscleSlug === "hamstrings")!;
+    expect(ham.primarySets).toBe(2); // 2 sets, not 4
+    expect(ham.functions).toHaveLength(2);
+    expect(ham.functions.every((f) => f.primarySets === 2)).toBe(true);
+  });
+
   it("aggregates equivalents by muscle_function across different exercises", () => {
     // A dumbbell press shares chest horizontal adduction (primary) with bench.
     const dbPressTargets: ReportSet["targets"] = [

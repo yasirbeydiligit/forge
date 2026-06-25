@@ -145,7 +145,11 @@ export function buildSessionReport(input: {
     if (prType === "rir") rirPrCount += 1;
 
     // Muscle / function distribution + time attribution to primary muscles.
+    // Functions are counted per target; a muscle is counted ONCE per set (even
+    // when the exercise hits it via two functions) so muscle-level set counts
+    // reflect actual sets, not target rows.
     const primaryMuscleSlugs = new Set<string>();
+    const secondaryMuscleSlugs = new Set<string>();
     for (const t of s.targets) {
       let m = muscles.get(t.muscleSlug);
       if (!m) {
@@ -170,15 +174,23 @@ export function buildSessionReport(input: {
         m.functions.set(t.functionSlug, f);
       }
       if (t.role === "primary") {
-        m.primarySets += 1;
         f.primarySets += 1;
         primaryMuscleSlugs.add(t.muscleSlug);
       } else {
-        m.secondarySets += 1;
         f.secondarySets += 1;
+        secondaryMuscleSlugs.add(t.muscleSlug);
       }
     }
-    for (const slug of primaryMuscleSlugs) muscles.get(slug)!.activeMs += block;
+    // Roll up to the muscle once per set (primary wins over secondary).
+    for (const slug of primaryMuscleSlugs) {
+      const m = muscles.get(slug)!;
+      m.primarySets += 1;
+      m.activeMs += block;
+    }
+    for (const slug of secondaryMuscleSlugs) {
+      if (primaryMuscleSlugs.has(slug)) continue;
+      muscles.get(slug)!.secondarySets += 1;
+    }
 
     // Exercise grouping (first appearance order).
     let ex = exercises.get(s.exerciseId);
