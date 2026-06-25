@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { addWeeks, endOfWeek, format, parseISO, startOfWeek } from "date-fns";
 import { Activity, ArrowLeft, Dumbbell, NotebookPen } from "lucide-react";
 
 import { getInitials } from "@/components/shell/user-menu";
@@ -13,16 +14,31 @@ import { formatDate, formatNumber } from "@/lib/format";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { DailyMetric } from "@/lib/types";
 
+import { loadCoachWeekly } from "./coach-weekly-loader";
+import { CoachWeeklyReportView } from "./coach-weekly-report";
+
 export const metadata: Metadata = { title: "Sporcu" };
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export default async function AthleteDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ athleteId: string }>;
+  searchParams: Promise<{ week?: string }>;
 }) {
   await requireCoach();
   const { athleteId } = await params;
+  const { week } = await searchParams;
   const supabase = await createSupabaseServerClient();
+
+  // Week selection (Mon–Sun) from ?week=YYYY-MM-DD; defaults to the current week.
+  const ref = week && ISO_DATE.test(week) ? parseISO(week) : new Date();
+  const weekStartD = startOfWeek(ref, { weekStartsOn: 1 });
+  const weekEndD = endOfWeek(ref, { weekStartsOn: 1 });
+  const weekStart = format(weekStartD, "yyyy-MM-dd");
+  const weekEnd = format(weekEndD, "yyyy-MM-dd");
 
   const { data: athlete } = await supabase
     .from("profiles")
@@ -31,7 +47,7 @@ export default async function AthleteDetailPage({
     .maybeSingle();
   if (!athlete) notFound();
 
-  const [{ data: enrollmentsData }, { data: sessionsData }, { data: metricsData }] =
+  const [{ data: enrollmentsData }, { data: sessionsData }, { data: metricsData }, weekly] =
     await Promise.all([
       supabase
         .from("enrollments")
@@ -51,7 +67,13 @@ export default async function AthleteDetailPage({
         .eq("athlete_id", athleteId)
         .order("metric_date", { ascending: false })
         .limit(10),
+      loadCoachWeekly(supabase, athleteId, weekStart, weekEnd),
     ]);
+
+  const base = `/panel/sporcular/${athleteId}`;
+  const prevHref = `${base}?week=${format(addWeeks(weekStartD, -1), "yyyy-MM-dd")}`;
+  const nextHref = `${base}?week=${format(addWeeks(weekStartD, 1), "yyyy-MM-dd")}`;
+  const weekLabel = `${format(weekStartD, "d MMM")} – ${format(weekEndD, "d MMM")}`;
 
   const enrollments = (enrollmentsData ?? []) as {
     id: string;
@@ -109,6 +131,14 @@ export default async function AthleteDetailPage({
           </div>
         )}
       </section>
+
+      <CoachWeeklyReportView
+        report={weekly.report}
+        plateaus={weekly.plateaus}
+        weekLabel={weekLabel}
+        prevHref={prevHref}
+        nextHref={nextHref}
+      />
 
       {metrics.length > 0 ? (
         <section className="space-y-3">
