@@ -129,10 +129,6 @@ export default async function WorkoutDayPage({
               (sum, we) => sum + (we.target_sets ?? 0),
               0,
             );
-            const volume = loggedSets.reduce(
-              (sum, s) => sum + (Number(s.weight) || 0) * (s.reps || 0),
-              0,
-            );
             const setsByExercise = new Map<string, number>();
             for (const s of loggedSets) {
               setsByExercise.set(
@@ -172,10 +168,9 @@ export default async function WorkoutDayPage({
                         Başlanmadı
                       </span>
                     )}
-                    {volume > 0 ? (
+                    {loggedSets.length > 0 ? (
                       <span className="font-mono text-xs tabular-nums text-muted-foreground">
-                        {volume.toLocaleString("tr-TR")} kg · {loggedSets.length}/
-                        {plannedSets || "—"} set
+                        {loggedSets.length}/{plannedSets || "—"} set
                       </span>
                     ) : null}
                     {durationMs != null ? (

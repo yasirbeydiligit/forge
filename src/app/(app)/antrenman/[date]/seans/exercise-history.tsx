@@ -35,7 +35,7 @@ export function ExerciseHistory({ stats }: { stats: PlayerStats }) {
       >
         <span className="text-label text-paper-muted">Geçmiş</span>
         <span className="flex items-center gap-2 font-mono text-xs tabular-nums text-paper-muted">
-          {stats.allTimePr != null ? <span>PR {stats.allTimePr}</span> : null}
+          {stats.allTimePr != null ? <span>en ağır {stats.allTimePr}</span> : null}
           {stats.recentSessions[0] ? (
             <span className="text-paper-foreground">son · {stats.recentSessions[0].scheme}</span>
           ) : null}
@@ -50,10 +50,9 @@ export function ExerciseHistory({ stats }: { stats: PlayerStats }) {
 
       {open ? (
         <div className="border-t border-paper-border p-3">
-          <div className="grid grid-cols-4 divide-x divide-paper-border">
-            <Stat label="tah. 1RM" value={stats.bestEst1RM ?? "—"} />
-            <Stat label="PR kg" value={stats.allTimePr ?? "—"} />
-            <Stat label="hacim·4h" value={stats.volume4w.toLocaleString("tr-TR")} />
+          <div className="grid grid-cols-3 divide-x divide-paper-border">
+            <Stat label="en ağır" value={stats.allTimePr ?? "—"} />
+            <Stat label="set·4h" value={stats.volumeSets4w} />
             <Stat label="RIR·4h" value={stats.avgRir4w ?? "—"} />
           </div>
 

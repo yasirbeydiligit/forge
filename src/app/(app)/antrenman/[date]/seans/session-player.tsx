@@ -513,19 +513,11 @@ function FinishView({
             : null;
         return { weight: s.weight, reps: s.reps, pr: s.pr, deltaVsPrev };
       });
-      const volume = ex.sets.reduce((sum, s) => sum + (s.weight ?? 0) * (s.reps ?? 0), 0);
-      const prevSets = meta?.stats.prevSessionSets ?? [];
-      const prevVolume = prevSets.length
-        ? prevSets.reduce((sum, s) => sum + s.weight * (s.reps ?? 0), 0)
-        : null;
-      return { name: meta?.name ?? "Egzersiz", sets, volume, prevVolume };
+      const prevSetCount = meta?.stats.prevSessionSets.length ?? null;
+      return { name: meta?.name ?? "Egzersiz", sets, setCount: sets.length, prevSetCount };
     })
     .filter((e) => e.sets.length > 0);
 
-  const hasPrev = exercises.some((e) => e.prevVolume != null);
-  const totalPrevVolume = hasPrev
-    ? exercises.reduce((sum, e) => sum + (e.prevVolume ?? 0), 0)
-    : null;
   const totalReps = state.exercises.reduce(
     (sum, ex) => sum + ex.sets.reduce((a, s) => a + (s.reps ?? 0), 0),
     0,
@@ -543,8 +535,6 @@ function FinishView({
       <SessionSummary
         workoutName={data.workoutName}
         durationMs={durationMs}
-        volume={Math.round(totals.volume)}
-        prevVolume={totalPrevVolume != null ? Math.round(totalPrevVolume) : null}
         setCount={totals.setCount}
         totalReps={totalReps}
         prCount={totals.prCount}

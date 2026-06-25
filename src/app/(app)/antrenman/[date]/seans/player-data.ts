@@ -3,18 +3,22 @@
  * Display-oriented (names, targets, history) plus the already-logged sets used
  * to resume an in-progress session.
  */
+import type { PRSet } from "@/lib/pr/evaluate-pr";
 import type { AthleteInsight } from "@/lib/rag/insights-server";
 import type { ServerSet } from "@/lib/session/reducer";
 import type { ExerciseTarget } from "@/lib/session/types";
 
 export type PlayerStats = {
-  bestEst1RM: number | null;
+  /** Heaviest weight ever lifted (observed, not a formula). */
   allTimePr: number | null;
   allTimePrDate: string | null;
   prevSessionWeights: number[];
   prevSessionSets: { weight: number; reps: number | null }[];
-  volume4w: number;
+  /** Set-count volume over the trailing 28 days. */
+  volumeSets4w: number;
   avgRir4w: number | null;
+  /** PR frontier for the live evaluatePR check. */
+  prHistory: PRSet[];
   recentSessions: { date: string; scheme: string }[];
   trendPoints: number[];
   trendDelta: number | null;

@@ -52,3 +52,30 @@ describe("computeExerciseStats.prevSessionSets", () => {
     expect(stats.prevSessionSets).toEqual([]);
   });
 });
+
+describe("computeExerciseStats — set-count volume + PR frontier", () => {
+  it("volumeSets4w counts sets in the 28-day window (not tonnage)", () => {
+    const stats = computeExerciseStats(
+      [
+        row({ session_date: "2026-06-19", weight: 100, reps: 5 }),
+        row({ session_date: "2026-06-12", weight: 80, reps: 8 }),
+        row({ session_date: "2026-05-01", weight: 60, reps: 5 }), // outside window
+      ],
+      "2026-06-19",
+    );
+    expect(stats.volumeSets4w).toBe(2);
+  });
+
+  it("prHistory is the non-dominated frontier across all sets", () => {
+    const stats = computeExerciseStats(
+      [
+        row({ session_date: "2026-06-12", weight: 100, reps: 5 }),
+        row({ session_date: "2026-06-12", weight: 90, reps: 5 }), // dominated
+        row({ session_date: "2026-06-05", weight: 110, reps: 3 }),
+      ],
+      "2026-06-19",
+    );
+    const pairs = stats.prHistory.map((p) => `${p.weight}x${p.reps}`).sort();
+    expect(pairs).toEqual(["100x5", "110x3"]);
+  });
+});

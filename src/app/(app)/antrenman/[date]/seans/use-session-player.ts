@@ -240,7 +240,17 @@ export function useSessionPlayer(data: PlayerData) {
       const ex = stateRef.current.exercises[exerciseIndex];
       const meta = data.exercises[exerciseIndex];
       if (!ex || !meta) return false;
-      const pr = detectPr(meta.stats, { weight: input.weight, reps: input.reps });
+      // History = the exercise's all-time PR frontier plus the sets already done
+      // this session, so progressive sets within one workout can also be PRs.
+      const history = [
+        ...meta.stats.prHistory,
+        ...ex.sets.map((s) => ({ weight: s.weight, reps: s.reps, rir: s.rir })),
+      ];
+      const pr = detectPr(history, {
+        weight: input.weight,
+        reps: input.reps,
+        rir: input.rir,
+      });
       const localId =
         typeof crypto !== "undefined" && crypto.randomUUID
           ? crypto.randomUUID()

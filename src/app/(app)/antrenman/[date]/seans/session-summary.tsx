@@ -29,8 +29,8 @@ export type SummarySet = {
 export type SummaryExerciseDetail = {
   name: string;
   sets: SummarySet[];
-  volume: number;
-  prevVolume: number | null;
+  setCount: number;
+  prevSetCount: number | null;
 };
 
 /** Lightweight PR list shape kept for the PR margin note. */
@@ -39,8 +39,6 @@ export type SummaryExercise = { name: string; prSets: { weight: number | null; r
 export function SessionSummary({
   workoutName,
   durationMs,
-  volume,
-  prevVolume,
   setCount,
   totalReps,
   prCount,
@@ -53,8 +51,6 @@ export function SessionSummary({
 }: {
   workoutName: string;
   durationMs: number;
-  volume: number;
-  prevVolume: number | null;
   setCount: number;
   totalReps: number;
   prCount: number;
@@ -68,12 +64,10 @@ export function SessionSummary({
   const [note, setNote] = useState(initialNote);
   const [shareState, setShareState] = useState<"idle" | "sharing" | "done">("idle");
 
-  const volumeDelta = prevVolume != null ? volume - prevVolume : null;
-
   const share = async () => {
     setShareState("sharing");
     const prLine = prCount > 0 ? ` · ${prCount} PR` : "";
-    const body = `${workoutName} tamamlandı — ${fmtDuration(durationMs)}, ${volume.toLocaleString("tr-TR")} kg hacim, ${setCount} set${prLine}.`;
+    const body = `${workoutName} tamamlandı — ${fmtDuration(durationMs)}, ${setCount} set hacim${prLine}.`;
     const res = await shareToFeedAction({ body });
     setShareState("error" in res ? "idle" : "done");
   };
@@ -85,16 +79,11 @@ export function SessionSummary({
         <h1 className="text-display mt-1 text-lab-ink">{workoutName}</h1>
       </div>
 
-      {/* Hero metrics */}
+      {/* Hero metrics — "hacim" is set count in this product, never tonnage. */}
       <div className="grid grid-cols-3 gap-px overflow-hidden rounded-2xl border border-paper-border bg-paper-border">
         <Metric label="Süre" value={fmtDuration(durationMs)} />
-        <Metric
-          label="Hacim"
-          value={volume.toLocaleString("tr-TR")}
-          unit="kg"
-          delta={volumeDelta}
-        />
-        <Metric label="Set" value={String(setCount)} sub={`${totalReps} tekrar`} />
+        <Metric label="Hacim" value={String(setCount)} unit="set" />
+        <Metric label="Tekrar" value={String(totalReps)} sub={`${prCount} PR`} />
       </div>
 
       {prCount > 0 ? (
@@ -116,7 +105,7 @@ export function SessionSummary({
           <p className="text-label text-muted-foreground">Egzersizler</p>
           <div className="space-y-px overflow-hidden rounded-2xl border border-paper-border bg-paper-border">
             {exercises.map((ex) => {
-              const vDelta = ex.prevVolume != null ? ex.volume - ex.prevVolume : null;
+              const sDelta = ex.prevSetCount != null ? ex.setCount - ex.prevSetCount : null;
               return (
                 <div key={ex.name} className="bg-paper p-3">
                   <div className="flex items-baseline justify-between gap-3">
@@ -124,12 +113,12 @@ export function SessionSummary({
                       {ex.name}
                     </p>
                     <span className="shrink-0 font-mono text-[11px] tabular-nums text-paper-muted">
-                      {ex.volume.toLocaleString("tr-TR")} kg
-                      {vDelta != null && vDelta !== 0 ? (
-                        <span className={vDelta > 0 ? "text-lab-green" : "text-lab-amber"}>
+                      {ex.setCount} set
+                      {sDelta != null && sDelta !== 0 ? (
+                        <span className={sDelta > 0 ? "text-lab-green" : "text-lab-amber"}>
                           {" "}
-                          {vDelta > 0 ? "+" : ""}
-                          {Math.round(vDelta).toLocaleString("tr-TR")}
+                          {sDelta > 0 ? "+" : ""}
+                          {sDelta}
                         </span>
                       ) : null}
                     </span>

@@ -27,7 +27,7 @@ import type { Database } from "@/lib/database.types";
 import { toDateKey } from "@/lib/format";
 import {
   setsAvgRir,
-  setsVolume,
+  setsCount,
   type HistorySetRow,
 } from "@/lib/logbook-stats";
 
@@ -206,9 +206,10 @@ async function recentHistoryRows(
 }
 
 /**
- * week-over-week total training-volume change (%). Compares this 7-day volume
- * against the previous 7-day volume. null when there's no previous-week volume
- * (can't compute a percentage from zero).
+ * week-over-week training-volume change (%), where volume is SET COUNT (this
+ * product never measures tonnage). Compares this 7-day set count against the
+ * previous 7-day set count. null when there's no previous-week volume (can't
+ * compute a percentage from zero).
  */
 function volumeWowPct(rows: HistorySetRow[], today: Date): number | null {
   const thisStart = subDays(today, 6).getTime();
@@ -223,9 +224,9 @@ function volumeWowPct(rows: HistorySetRow[], today: Date): number | null {
     else if (t >= prevStart && t <= prevEnd) prevWeek.push(r);
   }
 
-  const prevVolume = setsVolume(prevWeek);
+  const prevVolume = setsCount(prevWeek);
   if (prevVolume <= 0) return null;
-  const thisVolume = setsVolume(thisWeek);
+  const thisVolume = setsCount(thisWeek);
   return ((thisVolume - prevVolume) / prevVolume) * 100;
 }
 
