@@ -6,6 +6,7 @@
  * Note: "volume" in this product is SET COUNT, never tonnage (kg×reps), and PRs
  * are observed (no estimated-1RM formulas). See src/lib/pr/evaluate-pr.ts.
  */
+import { round1 } from "@/lib/format";
 import { prFrontier, type PRSet } from "@/lib/pr/evaluate-pr";
 
 export type HistorySetRow = {
@@ -67,10 +68,6 @@ export function setsAvgRir(sets: HistorySetRow[]): number | null {
   const rirs = sets.map((s) => s.rir).filter((r): r is number => r != null);
   if (rirs.length === 0) return null;
   return rirs.reduce((a, b) => a + Number(b), 0) / rirs.length;
-}
-
-function round1(n: number): number {
-  return Math.round(n * 10) / 10;
 }
 
 function groupBySession(rows: HistorySetRow[]) {

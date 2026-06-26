@@ -8,6 +8,8 @@
  * Rest and order are derived from performed_at (falling back to created_at), so
  * they reflect the real workout timing the logger captured.
  */
+import { round1 } from "@/lib/format";
+
 import type { TargetRef } from "./session-report";
 
 export type CoachWeekSet = {
@@ -58,10 +60,6 @@ function median(values: number[]): number | null {
   const mid = Math.floor(sorted.length / 2);
   const m = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
   return Math.round(m);
-}
-
-function round1(n: number): number {
-  return Math.round(n * 10) / 10;
 }
 
 export function buildCoachWeekly(sets: CoachWeekSet[]): CoachWeeklyReport {

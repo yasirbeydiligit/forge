@@ -12,6 +12,7 @@
  * `insights-server.ts` (which `getAthleteInsights` uses), mirroring the
  * request.ts / actions.ts split in `src/app/(app)/kutuphane`.
  */
+import { round1 } from "@/lib/format";
 
 /**
  * An insight rule, normalised to camelCase from the `insight_rules` table row.
@@ -41,11 +42,6 @@ export type FiredRule = {
   pinnedChunkId: string | null;
   retrievalQuery: string | null;
 };
-
-/** Round to one decimal place for display in note text. */
-function round1(n: number): number {
-  return Math.round(n * 10) / 10;
-}
 
 /**
  * Compare `value` against `threshold` using a textual comparator. Supports

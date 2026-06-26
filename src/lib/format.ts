@@ -32,6 +32,11 @@ export function formatNumber(
   return suffix ? `${text}${suffix}` : text;
 }
 
+/** Round to one decimal place (for display values like avg RIR / volume). */
+export function round1(n: number): number {
+  return Math.round(n * 10) / 10;
+}
+
 /** Up-to-two-letter uppercase initials for an avatar fallback. Lives here (not
  * in a "use client" module) so server components can call it too. */
 export function getInitials(name: string): string {
