@@ -4,7 +4,7 @@ import { useActionState, useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 
-import { createWorkout, updateWorkout, type FormState } from "../actions";
+import type { FormAction } from "./types";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -20,19 +20,24 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { Workout } from "@/lib/types";
 
+/** Shared workout-day create/edit dialog. */
 export function WorkoutDialog({
+  create,
+  update,
   programId,
   workout,
   trigger,
 }: {
+  create: FormAction;
+  update: FormAction;
   programId: string;
   workout?: Workout;
   trigger?: React.ReactNode;
 }) {
   const isEdit = Boolean(workout);
   const [open, setOpen] = useState(false);
-  const [state, formAction, isPending] = useActionState<FormState, FormData>(
-    isEdit ? updateWorkout : createWorkout,
+  const [state, formAction, isPending] = useActionState(
+    isEdit ? update : create,
     {},
   );
 

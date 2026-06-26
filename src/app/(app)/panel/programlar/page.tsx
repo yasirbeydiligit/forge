@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CalendarDays, Dumbbell, Users } from "lucide-react";
 
-import { ProgramDialog } from "./program-dialog";
+import { createProgram, updateProgram } from "./actions";
+import { ProgramDialog } from "@/components/programs/program-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { PaperCard } from "@/components/lab/lab";
 import { PageHeader } from "@/components/shell/page-header";
@@ -23,11 +24,14 @@ type ProgramRow = {
 };
 
 export default async function ProgramsPage() {
-  await requireCoach();
+  const coach = await requireCoach();
   const supabase = await createSupabaseServerClient();
+  // The coach's own (community) programs — not athletes' personal programs,
+  // which the coach can still read but manages nowhere here.
   const { data } = await supabase
     .from("programs")
     .select("id, name, description, cover_url, is_published, workouts(count), enrollments(count)")
+    .eq("created_by", coach.id)
     .order("created_at", { ascending: false });
 
   const programs = (data ?? []) as ProgramRow[];
@@ -38,7 +42,7 @@ export default async function ProgramsPage() {
         title="Programlar"
         description="Antrenman programlarını oluştur ve düzenle."
       >
-        <ProgramDialog />
+        <ProgramDialog create={createProgram} update={updateProgram} showPublish />
       </PageHeader>
 
       {programs.length === 0 ? (
@@ -46,7 +50,7 @@ export default async function ProgramsPage() {
           icon={Dumbbell}
           title="Henüz program yok"
           description="İlk programını oluştur, sonra antrenman günleri ve egzersizler ekle."
-          action={<ProgramDialog />}
+          action={<ProgramDialog create={createProgram} update={updateProgram} showPublish />}
         />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
