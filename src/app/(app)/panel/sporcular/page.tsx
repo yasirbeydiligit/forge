@@ -2,13 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronRight, Users } from "lucide-react";
 
-import { getInitials } from "@/components/shell/user-menu";
 import { EmptyState } from "@/components/empty-state";
 import { PaperCard } from "@/components/lab/lab";
 import { PageHeader } from "@/components/shell/page-header";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { requireCoach } from "@/lib/auth";
-import { formatDate } from "@/lib/format";
+import { formatDate, getInitials } from "@/lib/format";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Sporcular" };

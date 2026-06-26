@@ -32,6 +32,17 @@ export function formatNumber(
   return suffix ? `${text}${suffix}` : text;
 }
 
+/** Up-to-two-letter uppercase initials for an avatar fallback. Lives here (not
+ * in a "use client" module) so server components can call it too. */
+export function getInitials(name: string): string {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
+}
+
 export function formatRepRange(
   min: number | null,
   max: number | null,

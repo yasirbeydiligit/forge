@@ -4,13 +4,12 @@ import { notFound } from "next/navigation";
 import { addWeeks, endOfWeek, format, parseISO, startOfWeek } from "date-fns";
 import { Activity, ArrowLeft, Dumbbell, NotebookPen } from "lucide-react";
 
-import { getInitials } from "@/components/shell/user-menu";
 import { EmptyState } from "@/components/empty-state";
 import { SessionView, type SessionRow } from "@/components/logbook/session-view";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { requireCoach } from "@/lib/auth";
-import { formatDate, formatNumber } from "@/lib/format";
+import { formatDate, formatNumber, getInitials } from "@/lib/format";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { DailyMetric } from "@/lib/types";
 

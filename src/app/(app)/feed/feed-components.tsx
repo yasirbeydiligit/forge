@@ -19,7 +19,6 @@ import {
   toggleLike,
   type FormState,
 } from "./actions";
-import { getInitials } from "@/components/shell/user-menu";
 import { ImageUpload } from "@/components/image-upload";
 import { SubmitButton } from "@/components/submit-button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -28,7 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import type { Profile } from "@/lib/auth";
-import { formatRelative } from "@/lib/format";
+import { formatRelative, getInitials } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export type FeedAuthor = {
