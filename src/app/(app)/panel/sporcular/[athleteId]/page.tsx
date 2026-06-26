@@ -46,12 +46,23 @@ export default async function AthleteDetailPage({
     .maybeSingle();
   if (!athlete) notFound();
 
-  const [{ data: enrollmentsData }, { data: sessionsData }, { data: metricsData }, weekly] =
-    await Promise.all([
+  const [
+    { data: enrollmentsData },
+    { data: ownProgramsData },
+    { data: sessionsData },
+    { data: metricsData },
+    weekly,
+  ] = await Promise.all([
       supabase
         .from("enrollments")
         .select("id, status, program:programs(name)")
         .eq("athlete_id", athleteId),
+      // The athlete's own personal programs — coach read-only (RLS), for tracking.
+      supabase
+        .from("programs")
+        .select("id, name, description, workouts(count)")
+        .eq("created_by", athleteId)
+        .order("created_at", { ascending: false }),
       supabase
         .from("log_sessions")
         .select(
@@ -81,6 +92,12 @@ export default async function AthleteDetailPage({
   }[];
   const sessions = (sessionsData ?? []) as unknown as SessionRow[];
   const metrics = (metricsData ?? []) as DailyMetric[];
+  const ownPrograms = (ownProgramsData ?? []) as {
+    id: string;
+    name: string;
+    description: string | null;
+    workouts: { count: number }[];
+  }[];
 
   return (
     <div className="space-y-6">
@@ -130,6 +147,35 @@ export default async function AthleteDetailPage({
           </div>
         )}
       </section>
+
+      {ownPrograms.length > 0 ? (
+        <section className="space-y-3">
+          <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            <NotebookPen className="size-4" /> Kendi programları
+            <Badge variant="secondary" className="rounded-full">
+              salt-okunur
+            </Badge>
+          </h2>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {ownPrograms.map((p) => (
+              <div
+                key={p.id}
+                className="rounded-xl border border-border p-4"
+              >
+                <p className="font-medium">{p.name}</p>
+                {p.description ? (
+                  <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">
+                    {p.description}
+                  </p>
+                ) : null}
+                <p className="mt-2 font-mono text-xs tabular-nums text-muted-foreground">
+                  {p.workouts[0]?.count ?? 0} antrenman günü
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <CoachWeeklyReportView
         report={weekly.report}
