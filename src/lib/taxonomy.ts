@@ -71,5 +71,14 @@ export const EQUIPMENT_TYPE_LABELS_TR: Record<EquipmentType, string> = {
 
 export const muscleRoleLabelTr = { primary: "Birincil", secondary: "İkincil" } as const;
 
+/** Muscle regions (pgEnum muscle_region) → Turkish UI labels, in display order. */
+export const MUSCLE_REGIONS = ["upper", "lower", "core"] as const;
+export type MuscleRegion = (typeof MUSCLE_REGIONS)[number];
+export const MUSCLE_REGION_LABELS_TR: Record<MuscleRegion, string> = {
+  upper: "Üst vücut",
+  lower: "Alt vücut",
+  core: "Gövde / Core",
+};
+
 /** Shared RIR helper copy (first-use tooltip / caption). */
 export const RIR_HELP_TR = "RIR = Yedekte kalan tekrar (0 = tam başarısızlık)";
