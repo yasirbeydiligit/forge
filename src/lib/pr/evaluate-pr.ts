@@ -71,30 +71,37 @@ export function evaluatePR(
 
   const { weight: w, reps: r } = current;
 
-  // Rule A — dominance: current >= prior on both axes, strictly greater on one.
-  // Pick the heaviest such reference (tie-break highest reps) for readable copy.
-  let domRef: ValidSet | null = null;
-  for (const p of prior) {
-    const dominates = w >= p.weight && r >= p.reps && (w > p.weight || r > p.reps);
-    if (!dominates) continue;
-    if (!domRef || p.weight > domRef.weight || (p.weight === domRef.weight && p.reps > domRef.reps)) {
-      domRef = p;
+  // A strength PR must be a NEW record: if any prior set already matches or beats
+  // it on BOTH axes (>= weight AND >= reps), it is not a new best — only a RIR PR
+  // is still possible. This stops a repeated equal top set from counting again.
+  const alreadyAchieved = prior.some((p) => p.weight >= w && p.reps >= r);
+  if (!alreadyAchieved) {
+    // Rule A — dominance: current >= prior on both axes, strictly greater on one.
+    // Pick the heaviest such reference (tie-break highest reps) for readable copy.
+    let domRef: ValidSet | null = null;
+    for (const p of prior) {
+      const dominates = w >= p.weight && r >= p.reps && (w > p.weight || r > p.reps);
+      if (!dominates) continue;
+      if (!domRef || p.weight > domRef.weight || (p.weight === domRef.weight && p.reps > domRef.reps)) {
+        domRef = p;
+      }
+    }
+    if (domRef) {
+      const type: PRType =
+        w > domRef.weight && r > domRef.reps ? "both" : r === domRef.reps ? "weight" : "reps";
+      return { isPR: true, type, reference: domRef };
+    }
+
+    // Rule B — trade-off: weight up, reps down within the allowed drop.
+    for (const p of prior) {
+      if (w > p.weight && r < p.reps && r >= minMaintained(p.reps, cfg)) {
+        return { isPR: true, type: "tradeoff", reference: p };
+      }
     }
   }
-  if (domRef) {
-    const type: PRType =
-      w > domRef.weight && r > domRef.reps ? "both" : r === domRef.reps ? "weight" : "reps";
-    return { isPR: true, type, reference: domRef };
-  }
 
-  // Rule B — trade-off: weight up, reps down within the allowed drop.
-  for (const p of prior) {
-    if (w > p.weight && r < p.reps && r >= minMaintained(p.reps, cfg)) {
-      return { isPR: true, type: "tradeoff", reference: p };
-    }
-  }
-
-  // RIR PR — same weight + same reps, strictly lower RIR (harder effort).
+  // RIR PR — same weight + same reps, strictly lower RIR (harder effort). This is
+  // independent of the strength record (the set is "already achieved" by design).
   if (current.rir != null) {
     for (const p of prior) {
       if (p.weight === w && p.reps === r && p.rir != null && current.rir < p.rir) {

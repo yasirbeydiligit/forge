@@ -173,6 +173,21 @@ describe("buildSessionReport — PR + RIR PR counts", () => {
     const report = buildSessionReport({ sets: [set()], histories: noHistory });
     expect(report.prCount).toBe(0);
   });
+
+  it("counts a repeated identical top set only once", () => {
+    // Three 55×10 sets when the prior best was 55×8: only the first is a PR.
+    const report = buildSessionReport({
+      sets: [set({ weight: 55, reps: 10 }), set({ weight: 55, reps: 10 }), set({ weight: 55, reps: 10 })],
+      histories: {
+        bench: {
+          prHistory: [{ weight: 55, reps: 8, rir: null }],
+          prevSessionSets: [{ weight: 55, reps: 8, rir: null }],
+        },
+      },
+    });
+    expect(report.prCount).toBe(1);
+    expect(report.exercises[0].sets.map((s) => s.prType)).toEqual(["reps", null, null]);
+  });
 });
 
 describe("buildSessionReport — time distribution", () => {

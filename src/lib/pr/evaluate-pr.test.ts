@@ -58,6 +58,22 @@ describe("evaluatePR — Rule B (trade-off)", () => {
   });
 });
 
+describe("evaluatePR — not a new record", () => {
+  it("a repeated equal set is not a second PR", () => {
+    // First 55×10 beats a prior 55×8 (PR); an identical 55×10 afterwards is not.
+    expect(evaluatePR(h(55, 10), [h(55, 8)]).isPR).toBe(true);
+    expect(evaluatePR(h(55, 10), [h(55, 8), h(55, 10)]).isPR).toBe(false);
+  });
+  it("is not a PR when a strictly better prior set exists (heavier AND more reps)", () => {
+    // 105×3 when 110×5 is already on record is not a record, even vs an old 100×4.
+    expect(evaluatePR(h(105, 3), [h(100, 4), h(110, 5)]).isPR).toBe(false);
+  });
+  it("a set equaled by an earlier in-session set is not a PR (progressive sets)", () => {
+    expect(evaluatePR(h(70, 6), [h(60, 6)]).isPR).toBe(true);
+    expect(evaluatePR(h(70, 6), [h(60, 6), h(70, 6)]).isPR).toBe(false);
+  });
+});
+
 describe("evaluatePR — guards", () => {
   it("weight decreased => never PR", () => {
     expect(evaluatePR(h(95, 6), [h(100, 5)]).isPR).toBe(false);
