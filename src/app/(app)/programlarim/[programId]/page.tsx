@@ -52,7 +52,12 @@ export default async function MyProgramDetailPage({
         referencedTable: "workout_exercises",
       }),
     // RLS returns exactly system + the athlete's own exercises.
-    supabase.from("exercises").select("*").order("name", { ascending: true }),
+    supabase
+      .from("exercises")
+      .select("*")
+      .order("category", { ascending: true, nullsFirst: false })
+      .order("region", { ascending: true, nullsFirst: false })
+      .order("name", { ascending: true }),
   ]);
 
   const workouts = (workoutsData ?? []) as WorkoutWithExercises[];

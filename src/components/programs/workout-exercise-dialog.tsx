@@ -5,6 +5,7 @@ import { Plus, Repeat2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 import type { AlternativeSuggestion, FormAction } from "./types";
+import { ExerciseFilters } from "@/components/exercises/exercise-filters";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -28,6 +29,12 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  exerciseCategories,
+  exerciseRegions,
+  filterExercises,
+  groupExercisesByCategory,
+} from "@/lib/exercises/filter";
+import {
   EQUIPMENT_TYPE_LABELS_TR,
   MOVEMENT_PATTERN_LABELS_TR,
   RIR_HELP_TR,
@@ -35,11 +42,11 @@ import {
 import type { Exercise, WorkoutExercise } from "@/lib/types";
 
 /**
- * Shared "add/edit a workout exercise" dialog. The exercise picker lists system
- * and the user's own ("Özel") exercises in one grouped select, and offers a
- * "Muadil göster" action backed by suggest_exercise_alternatives — picking a
- * suggestion just swaps the selected exercise (muscle/function tracking stays
- * continuous because the alternative shares the same primary targets).
+ * Shared "add/edit a workout exercise" dialog. The exercise picker is filtered
+ * by category + sub-region and grouped by muscle group (not one flat
+ * alphabetical list); the user's own exercises carry an "Özel" marker. A
+ * "Muadil göster" action (suggest_exercise_alternatives) swaps to an alternative
+ * while keeping muscle/function tracking continuous.
  */
 export function WorkoutExerciseDialog({
   programId,
@@ -65,6 +72,9 @@ export function WorkoutExerciseDialog({
   const [exerciseId, setExerciseId] = useState(
     workoutExercise?.exercise_id ?? "",
   );
+  const [category, setCategory] = useState("");
+  const [region, setRegion] = useState("");
+  const [query, setQuery] = useState("");
   const [alts, setAlts] = useState<AlternativeSuggestion[] | null>(null);
   const [loadingAlts, setLoadingAlts] = useState(false);
   const [state, formAction, isPending] = useActionState(
@@ -72,12 +82,18 @@ export function WorkoutExerciseDialog({
     {},
   );
 
-  const { system, own } = useMemo(() => {
-    const system: Exercise[] = [];
-    const own: Exercise[] = [];
-    for (const ex of exercises) (ex.is_system ? system : own).push(ex);
-    return { system, own };
-  }, [exercises]);
+  const categories = useMemo(() => exerciseCategories(exercises), [exercises]);
+  const regions = useMemo(
+    () => exerciseRegions(exercises, category || undefined),
+    [exercises, category],
+  );
+  const groups = useMemo(
+    () =>
+      groupExercisesByCategory(
+        filterExercises(exercises, { category, region, query }),
+      ),
+    [exercises, category, region, query],
+  );
   const exerciseName = useMemo(
     () => exercises.find((e) => e.id === exerciseId)?.name ?? "",
     [exercises, exerciseId],
@@ -124,7 +140,7 @@ export function WorkoutExerciseDialog({
             {isEdit ? "Egzersizi düzenle" : "Antrenmana egzersiz ekle"}
           </DialogTitle>
           <DialogDescription>
-            Hedef set, tekrar ve ağırlık/RIR değerlerini belirle.
+            Kas grubuna ve bölgeye göre süzüp egzersizi seç; hedef değerleri gir.
           </DialogDescription>
         </DialogHeader>
 
@@ -138,32 +154,44 @@ export function WorkoutExerciseDialog({
 
           <div className="space-y-2">
             <Label>Egzersiz</Label>
+
+            <ExerciseFilters
+              categories={categories}
+              regions={regions}
+              category={category}
+              region={region}
+              query={query}
+              onCategory={(v) => {
+                setCategory(v);
+                setRegion("");
+              }}
+              onRegion={setRegion}
+              onQuery={setQuery}
+            />
+
             <Select value={exerciseId} onValueChange={setExerciseId}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Egzersiz seç" />
               </SelectTrigger>
               <SelectContent>
-                {system.length ? (
-                  <SelectGroup>
-                    <SelectLabel>Sistem egzersizleri</SelectLabel>
-                    {system.map((ex) => (
-                      <SelectItem key={ex.id} value={ex.id}>
-                        {ex.name}
-                        {ex.category ? ` · ${ex.category}` : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                ) : null}
-                {own.length ? (
-                  <SelectGroup>
-                    <SelectLabel>Özel egzersizlerim</SelectLabel>
-                    {own.map((ex) => (
-                      <SelectItem key={ex.id} value={ex.id}>
-                        {ex.name} · Özel
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                ) : null}
+                {groups.length === 0 ? (
+                  <p className="px-2 py-1.5 text-sm text-muted-foreground">
+                    Filtreyle eşleşen egzersiz yok.
+                  </p>
+                ) : (
+                  groups.map((group) => (
+                    <SelectGroup key={group.category}>
+                      <SelectLabel>{group.category}</SelectLabel>
+                      {group.items.map((ex) => (
+                        <SelectItem key={ex.id} value={ex.id}>
+                          {ex.name}
+                          {ex.region ? ` · ${ex.region}` : ""}
+                          {!ex.is_system ? " · Özel" : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  ))
+                )}
               </SelectContent>
             </Select>
 

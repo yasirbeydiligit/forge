@@ -51,6 +51,8 @@ export default async function ProgramDetailPage({
       .from("exercises")
       .select("*")
       .or(`is_system.eq.true,created_by.eq.${coach.id}`)
+      .order("category", { ascending: true, nullsFirst: false })
+      .order("region", { ascending: true, nullsFirst: false })
       .order("name", { ascending: true }),
   ]);
 
