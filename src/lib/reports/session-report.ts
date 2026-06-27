@@ -23,6 +23,12 @@ export type ReportSet = {
   weight: number | null;
   reps: number | null;
   rir: number | null;
+  /** Exercise sub-region (e.g. "Üst Göğüs"); belongs to the primary muscle. */
+  region: string | null;
+  /** Exercise category (e.g. "Göğüs"); the region fallback for PR labels. */
+  category: string | null;
+  /** Per-set athlete note, surfaced in the movement summary. */
+  note: string | null;
   performedAt: string | null;
   createdAt: string;
   targets: TargetRef[];
@@ -44,11 +50,19 @@ export type FunctionVolume = {
   secondarySets: number;
 };
 
+/** Primary-set count for one exercise sub-region within a muscle. */
+export type RegionVolume = {
+  region: string;
+  primarySets: number;
+};
+
 export type MuscleVolume = {
   muscleSlug: string;
   muscleNameTr: string;
   primarySets: number;
   secondarySets: number;
+  /** Primary sets broken down by exercise region (sorted desc); [] if none. */
+  regions: RegionVolume[];
   functions: FunctionVolume[];
   /** Approximate active time attributed to this muscle's primary work (ms). */
   activeMs: number;
@@ -57,11 +71,20 @@ export type MuscleVolume = {
 export type ExerciseDelta = {
   exerciseId: string;
   exerciseName: string;
+  region: string | null;
+  category: string | null;
   weight: Direction | null;
   reps: Direction | null;
   prCount: number;
   rirPrCount: number;
-  sets: { weight: number | null; reps: number | null; prType: PRType | null }[];
+  sets: { weight: number | null; reps: number | null; prType: PRType | null; note: string | null }[];
+};
+
+/** Strength PRs grouped by region (fallback category, then exercise name). */
+export type PrGroup = {
+  label: string;
+  kind: "region" | "category" | "exercise";
+  count: number;
 };
 
 export type SessionReport = {
@@ -70,6 +93,7 @@ export type SessionReport = {
   exercises: ExerciseDelta[];
   prCount: number;
   rirPrCount: number;
+  prGroups: PrGroup[];
 };
 
 function timeOf(s: ReportSet): number {
@@ -103,6 +127,7 @@ type MuscleAcc = {
   muscleNameTr: string;
   primarySets: number;
   secondarySets: number;
+  regions: Map<string, number>;
   functions: Map<string, FunctionVolume>;
   activeMs: number;
 };
@@ -110,11 +135,15 @@ type MuscleAcc = {
 type ExAcc = {
   exerciseId: string;
   exerciseName: string;
+  region: string | null;
+  category: string | null;
   order: number;
   prCount: number;
   rirPrCount: number;
-  sets: { weight: number | null; reps: number | null; prType: PRType | null }[];
+  sets: { weight: number | null; reps: number | null; prType: PRType | null; note: string | null }[];
 };
+
+type PrGroupAcc = { label: string; kind: PrGroup["kind"]; count: number; order: number };
 
 export function buildSessionReport(input: {
   sets: ReportSet[];
@@ -126,6 +155,7 @@ export function buildSessionReport(input: {
   const muscles = new Map<string, MuscleAcc>();
   const running = new Map<string, PRSet[]>(); // exerciseId -> history so far
   const exercises = new Map<string, ExAcc>();
+  const prGroupMap = new Map<string, PrGroupAcc>();
 
   let prevTime: number | null = null;
   let prCount = 0;
@@ -141,7 +171,15 @@ export function buildSessionReport(input: {
     const result = evaluatePR({ weight: s.weight, reps: s.reps, rir: s.rir }, hist);
     running.set(s.exerciseId, [...hist, { weight: s.weight, reps: s.reps, rir: s.rir }]);
     const prType: PRType | null = result.isPR ? result.type : null;
-    if (prType && prType !== "rir") prCount += 1;
+    if (prType && prType !== "rir") {
+      prCount += 1;
+      // Group strength PRs by region, falling back to category then name.
+      const kind: PrGroup["kind"] = s.region ? "region" : s.category ? "category" : "exercise";
+      const label = s.region ?? s.category ?? s.exerciseName;
+      const g = prGroupMap.get(label);
+      if (g) g.count += 1;
+      else prGroupMap.set(label, { label, kind, count: 1, order: prGroupMap.size });
+    }
     if (prType === "rir") rirPrCount += 1;
 
     // Muscle / function distribution + time attribution to primary muscles.
@@ -158,6 +196,7 @@ export function buildSessionReport(input: {
           muscleNameTr: t.muscleNameTr,
           primarySets: 0,
           secondarySets: 0,
+          regions: new Map(),
           functions: new Map(),
           activeMs: 0,
         };
@@ -181,11 +220,13 @@ export function buildSessionReport(input: {
         secondaryMuscleSlugs.add(t.muscleSlug);
       }
     }
-    // Roll up to the muscle once per set (primary wins over secondary).
+    // Roll up to the muscle once per set (primary wins over secondary). The
+    // exercise's region belongs to its primary muscle(s), so attribute it there.
     for (const slug of primaryMuscleSlugs) {
       const m = muscles.get(slug)!;
       m.primarySets += 1;
       m.activeMs += block;
+      if (s.region) m.regions.set(s.region, (m.regions.get(s.region) ?? 0) + 1);
     }
     for (const slug of secondaryMuscleSlugs) {
       if (primaryMuscleSlugs.has(slug)) continue;
@@ -198,6 +239,8 @@ export function buildSessionReport(input: {
       ex = {
         exerciseId: s.exerciseId,
         exerciseName: s.exerciseName,
+        region: s.region,
+        category: s.category,
         order: i,
         prCount: 0,
         rirPrCount: 0,
@@ -205,7 +248,7 @@ export function buildSessionReport(input: {
       };
       exercises.set(s.exerciseId, ex);
     }
-    ex.sets.push({ weight: s.weight, reps: s.reps, prType });
+    ex.sets.push({ weight: s.weight, reps: s.reps, prType, note: s.note });
     if (prType && prType !== "rir") ex.prCount += 1;
     if (prType === "rir") ex.rirPrCount += 1;
   });
@@ -217,6 +260,9 @@ export function buildSessionReport(input: {
       primarySets: m.primarySets,
       secondarySets: m.secondarySets,
       activeMs: m.activeMs,
+      regions: [...m.regions.entries()]
+        .map(([region, primarySets]) => ({ region, primarySets }))
+        .sort((a, b) => b.primarySets - a.primarySets),
       functions: [...m.functions.values()].sort(
         (a, b) => b.primarySets - a.primarySets || b.secondarySets - a.secondarySets,
       ),
@@ -242,6 +288,8 @@ export function buildSessionReport(input: {
       return {
         exerciseId: ex.exerciseId,
         exerciseName: ex.exerciseName,
+        region: ex.region,
+        category: ex.category,
         weight,
         reps,
         prCount: ex.prCount,
@@ -250,11 +298,16 @@ export function buildSessionReport(input: {
       };
     });
 
+  const prGroups: PrGroup[] = [...prGroupMap.values()]
+    .sort((a, b) => b.count - a.count || a.order - b.order)
+    .map(({ label, kind, count }) => ({ label, kind, count }));
+
   return {
     totalSets: sets.length,
     muscles: muscleList,
     exercises: exerciseList,
     prCount,
     rirPrCount,
+    prGroups,
   };
 }

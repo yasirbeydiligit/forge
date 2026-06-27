@@ -30,10 +30,16 @@ type SetRow = {
   weight: number | null;
   reps: number | null;
   rir: number | null;
+  notes: string | null;
   performed_at: string | null;
   created_at: string;
   exercise_id: string;
-  exercise: { name: string; exercise_muscle_targets: TargetRow[] } | null;
+  exercise: {
+    name: string;
+    category: string | null;
+    region: string | null;
+    exercise_muscle_targets: TargetRow[];
+  } | null;
 };
 
 type HistoryRow = {
@@ -78,7 +84,7 @@ export async function loadSessionReport(
   const { data: rawSets } = await supabase
     .from("log_sets")
     .select(
-      "weight, reps, rir, performed_at, created_at, exercise_id, exercise:exercises(name, exercise_muscle_targets(role, muscle_functions(slug, name_tr, muscles(slug, name_tr))))",
+      "weight, reps, rir, notes, performed_at, created_at, exercise_id, exercise:exercises(name, category, region, exercise_muscle_targets(role, muscle_functions(slug, name_tr, muscles(slug, name_tr))))",
     )
     .eq("session_id", sessionRow.id);
 
@@ -91,6 +97,9 @@ export async function loadSessionReport(
     weight: r.weight != null ? Number(r.weight) : null,
     reps: r.reps,
     rir: r.rir != null ? Number(r.rir) : null,
+    region: r.exercise?.region ?? null,
+    category: r.exercise?.category ?? null,
+    note: r.notes && r.notes.trim() ? r.notes.trim() : null,
     performedAt: r.performed_at,
     createdAt: r.created_at,
     targets: toTargets(r.exercise?.exercise_muscle_targets ?? []),

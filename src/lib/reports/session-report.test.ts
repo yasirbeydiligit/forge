@@ -29,6 +29,9 @@ function set(o: Partial<ReportSet> = {}): ReportSet {
     weight: 100,
     reps: 5,
     rir: null,
+    region: null,
+    category: null,
+    note: null,
     performedAt: "2026-06-25T10:00:00.000Z",
     createdAt: "2026-06-25T10:00:00.000Z",
     targets: pressTargets(),
@@ -37,6 +40,78 @@ function set(o: Partial<ReportSet> = {}): ReportSet {
 }
 
 const noHistory = {};
+
+describe("buildSessionReport — region sub-breakdown", () => {
+  it("breaks a muscle's primary sets down by exercise region", () => {
+    const report = buildSessionReport({
+      sets: [
+        set({ exerciseId: "incline", region: "Üst Göğüs" }),
+        set({ exerciseId: "incline", region: "Üst Göğüs" }),
+        set({ exerciseId: "incline", region: "Üst Göğüs" }),
+        set({ exerciseId: "pecdeck", region: "Orta Göğüs" }),
+        set({ exerciseId: "pecdeck", region: "Orta Göğüs" }),
+        set({ exerciseId: "pullover", region: "Alt Göğüs" }),
+        set({ exerciseId: "pullover", region: "Alt Göğüs" }),
+      ],
+      histories: noHistory,
+    });
+    const chest = report.muscles.find((m) => m.muscleSlug === "chest")!;
+    expect(chest.primarySets).toBe(7);
+    expect(chest.regions).toEqual([
+      { region: "Üst Göğüs", primarySets: 3 },
+      { region: "Orta Göğüs", primarySets: 2 },
+      { region: "Alt Göğüs", primarySets: 2 },
+    ]);
+  });
+
+  it("does not attribute a primary exercise's region to a secondary muscle", () => {
+    // Bench is chest-primary, triceps-secondary, region 'Orta Göğüs'.
+    const report = buildSessionReport({
+      sets: [set({ region: "Orta Göğüs" }), set({ region: "Orta Göğüs" })],
+      histories: noHistory,
+    });
+    const triceps = report.muscles.find((m) => m.muscleSlug === "triceps")!;
+    expect(triceps.regions).toEqual([]);
+  });
+
+  it("leaves regions empty when no set has a region", () => {
+    const report = buildSessionReport({ sets: [set(), set()], histories: noHistory });
+    const chest = report.muscles.find((m) => m.muscleSlug === "chest")!;
+    expect(chest.regions).toEqual([]);
+  });
+});
+
+describe("buildSessionReport — PR grouping by region/category", () => {
+  it("groups strength PRs by region, falling back to category", () => {
+    const report = buildSessionReport({
+      sets: [
+        set({ exerciseId: "incline", region: "Üst Göğüs", category: "Göğüs", weight: 105, reps: 5 }),
+        set({ exerciseId: "ohp", region: null, category: "Omuz", weight: 60, reps: 5, targets: [
+          { muscleSlug: "front-delt", muscleNameTr: "Ön omuz", functionSlug: "fd", functionNameTr: "Omuz fleksiyonu", role: "primary" },
+        ] }),
+      ],
+      histories: {
+        incline: { prHistory: [{ weight: 100, reps: 5, rir: null }], prevSessionSets: [{ weight: 100, reps: 5, rir: null }] },
+        ohp: { prHistory: [{ weight: 55, reps: 5, rir: null }], prevSessionSets: [{ weight: 55, reps: 5, rir: null }] },
+      },
+    });
+    expect(report.prCount).toBe(2);
+    expect(report.prGroups).toEqual([
+      { label: "Üst Göğüs", kind: "region", count: 1 },
+      { label: "Omuz", kind: "category", count: 1 },
+    ]);
+  });
+});
+
+describe("buildSessionReport — per-set notes", () => {
+  it("carries each set's note into the movement summary", () => {
+    const report = buildSessionReport({
+      sets: [set({ note: "sağ omuz hafif ağrı" }), set({ note: null })],
+      histories: noHistory,
+    });
+    expect(report.exercises[0].sets.map((s) => s.note)).toEqual(["sağ omuz hafif ağrı", null]);
+  });
+});
 
 describe("buildSessionReport — muscle/function distribution", () => {
   it("counts primary and secondary sets per muscle and per function", () => {
