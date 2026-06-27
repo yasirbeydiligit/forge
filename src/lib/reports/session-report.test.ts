@@ -283,6 +283,18 @@ describe("buildSessionReport — time distribution", () => {
     expect(triceps.activeMs).toBe(0);
   });
 
+  it("caps an outlier gap so a long pause does not inflate a muscle's time", () => {
+    const report = buildSessionReport({
+      sets: [
+        set({ performedAt: "2026-06-25T10:00:00.000Z" }),
+        set({ performedAt: "2026-06-25T12:00:00.000Z" }), // +2h pause
+      ],
+      histories: noHistory,
+    });
+    const chest = report.muscles.find((m) => m.muscleSlug === "chest")!;
+    expect(chest.activeMs).toBe(10 * 60_000); // capped at 10 min
+  });
+
   it("falls back to createdAt when performedAt is null", () => {
     const report = buildSessionReport({
       sets: [

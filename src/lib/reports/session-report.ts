@@ -96,6 +96,13 @@ export type SessionReport = {
   prGroups: PrGroup[];
 };
 
+/**
+ * Cap for the time attributed to a single set's block. A genuine set + rest is a
+ * few minutes; a larger gap means the athlete paused (or left the session open),
+ * so we cap it instead of dumping an outlier onto one muscle's "active time".
+ */
+const MAX_SET_BLOCK_MS = 10 * 60_000;
+
 function timeOf(s: ReportSet): number {
   return new Date(s.performedAt ?? s.createdAt).getTime();
 }
@@ -163,7 +170,7 @@ export function buildSessionReport(input: {
 
   ordered.forEach((s, i) => {
     const time = timeOf(s);
-    const block = prevTime == null ? 0 : Math.max(0, time - prevTime);
+    const block = prevTime == null ? 0 : Math.min(MAX_SET_BLOCK_MS, Math.max(0, time - prevTime));
     prevTime = time;
 
     // PR evaluation against prior history plus earlier in-session sets.
