@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { addWeeks, endOfWeek, format, parseISO, startOfWeek } from "date-fns";
-import { Activity, ArrowLeft, Dumbbell, NotebookPen } from "lucide-react";
+import { Activity, ArrowLeft, ChevronRight, Dumbbell, NotebookPen } from "lucide-react";
 
 import { EmptyState } from "@/components/empty-state";
 import { SessionView, type SessionRow } from "@/components/logbook/session-view";
@@ -234,7 +234,16 @@ export default async function AthleteDetailPage({
         ) : (
           <div className="space-y-4">
             {sessions.map((s) => (
-              <SessionView key={s.id} session={s} />
+              <div key={s.id} className="space-y-1.5">
+                <SessionView session={s} />
+                <Link
+                  href={`/panel/sporcular/${athleteId}/seans/${s.id}`}
+                  className="inline-flex items-center gap-1 px-1 text-xs font-medium text-lab-green hover:underline"
+                >
+                  Kas raporunu gör
+                  <ChevronRight className="size-3.5" />
+                </Link>
+              </div>
             ))}
           </div>
         )}

@@ -67,26 +67,21 @@ function toTargets(rows: TargetRow[]): TargetRef[] {
   return out;
 }
 
-export async function loadSessionReport(
-  supabase: Client,
-  athleteId: string,
-  date: string,
-  assignmentId: string,
-): Promise<SessionReport | null> {
-  const { data: sessionRow } = await supabase
-    .from("log_sessions")
-    .select("id")
-    .eq("athlete_id", athleteId)
-    .eq("assignment_id", assignmentId)
-    .maybeSingle();
-  if (!sessionRow) return null;
+const SET_SELECT =
+  "weight, reps, rir, notes, performed_at, created_at, exercise_id, exercise:exercises(name, category, region, exercise_muscle_targets(role, muscle_functions(slug, name_tr, muscles(slug, name_tr))))";
 
-  const { data: rawSets } = await supabase
-    .from("log_sets")
-    .select(
-      "weight, reps, rir, notes, performed_at, created_at, exercise_id, exercise:exercises(name, category, region, exercise_muscle_targets(role, muscle_functions(slug, name_tr, muscles(slug, name_tr))))",
-    )
-    .eq("session_id", sessionRow.id);
+/**
+ * Build the report for one session. History is filtered to `athleteId` (not just
+ * RLS) so a coach reading several athletes never contaminates one athlete's PR /
+ * delta history.
+ */
+async function reportForSession(
+  supabase: Client,
+  sessionId: string,
+  athleteId: string,
+  cutoffDate: string,
+): Promise<SessionReport | null> {
+  const { data: rawSets } = await supabase.from("log_sets").select(SET_SELECT).eq("session_id", sessionId);
 
   const setRows = (rawSets ?? []) as unknown as SetRow[];
   if (setRows.length === 0) return null;
@@ -105,17 +100,18 @@ export async function loadSessionReport(
     targets: toTargets(r.exercise?.exercise_muscle_targets ?? []),
   }));
 
-  // Prior history per exercise (strictly before this session's date).
+  // Prior history per exercise for this athlete (strictly before cutoffDate).
   const exerciseIds = [...new Set(sets.map((s) => s.exerciseId))];
   const { data: rawHistory } = exerciseIds.length
     ? await supabase
         .from("log_sets")
-        .select("weight, reps, rir, exercise_id, session:log_sessions(session_date)")
+        .select("weight, reps, rir, exercise_id, session:log_sessions!inner(session_date, athlete_id)")
+        .eq("session.athlete_id", athleteId)
         .in("exercise_id", exerciseIds)
     : { data: [] };
 
   const historyRows = ((rawHistory ?? []) as unknown as HistoryRow[]).filter(
-    (r) => r.session && r.session.session_date < date,
+    (r) => r.session && r.session.session_date < cutoffDate,
   );
 
   const histories: Record<string, { prHistory: PRSet[]; prevSessionSets: PRSet[] }> = {};
@@ -138,4 +134,72 @@ export async function loadSessionReport(
   }
 
   return buildSessionReport({ sets, histories });
+}
+
+/** Athlete's own report, keyed by the calendar assignment (live finish summary). */
+export async function loadSessionReport(
+  supabase: Client,
+  athleteId: string,
+  date: string,
+  assignmentId: string,
+): Promise<SessionReport | null> {
+  const { data: sessionRow } = await supabase
+    .from("log_sessions")
+    .select("id")
+    .eq("athlete_id", athleteId)
+    .eq("assignment_id", assignmentId)
+    .maybeSingle();
+  if (!sessionRow) return null;
+  return reportForSession(supabase, sessionRow.id, athleteId, date);
+}
+
+export type SessionReportMeta = {
+  workoutName: string;
+  sessionDate: string;
+  completed: boolean;
+  notes: string | null;
+  durationMs: number | null;
+};
+
+/** Any session by id (coach view of an athlete's session). RLS gates access. */
+export async function loadSessionReportById(
+  supabase: Client,
+  sessionId: string,
+): Promise<{ report: SessionReport | null; meta: SessionReportMeta } | null> {
+  const { data: s } = await supabase
+    .from("log_sessions")
+    .select(
+      "id, athlete_id, session_date, completed, notes, created_at, completed_at, workout:workouts(name)",
+    )
+    .eq("id", sessionId)
+    .maybeSingle();
+  if (!s) return null;
+
+  const session = s as unknown as {
+    id: string;
+    athlete_id: string;
+    session_date: string;
+    completed: boolean;
+    notes: string | null;
+    created_at: string;
+    completed_at: string | null;
+    workout: { name: string } | null;
+  };
+
+  const report = await reportForSession(supabase, session.id, session.athlete_id, session.session_date);
+  const durationMs =
+    session.completed_at && session.created_at
+      ? new Date(session.completed_at).getTime() - new Date(session.created_at).getTime()
+      : null;
+
+  return {
+    report,
+    meta: {
+      workoutName: session.workout?.name ?? "Seans",
+      sessionDate: session.session_date,
+      completed: session.completed,
+      notes: session.notes,
+      durationMs,
+    },
+  };
 }
