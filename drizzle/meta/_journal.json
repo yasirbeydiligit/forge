@@ -134,13 +134,6 @@
       "when": 1782384413991,
       "tag": "0018_lowly_doomsday",
       "breakpoints": true
-    },
-    {
-      "idx": 19,
-      "version": "7",
-      "when": 1782384413992,
-      "tag": "0019_athlete_exercise_visibility",
-      "breakpoints": true
     }
   ]
 }
