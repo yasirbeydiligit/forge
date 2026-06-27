@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Plus } from "lucide-react";
 
 import { createExercise, deleteExercise, updateExercise } from "./actions";
 import { ExerciseForm } from "@/components/exercises/exercise-form";
@@ -7,26 +8,27 @@ import {
   type ExerciseWithTargets,
 } from "@/components/exercises/exercise-library";
 import { PageHeader } from "@/components/shell/page-header";
-import { requireCoach } from "@/lib/auth";
+import { Button } from "@/components/ui/button";
+import { requireProfile } from "@/lib/auth";
 import { loadMuscleTaxonomy } from "@/lib/exercises/load-taxonomy";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Exercise } from "@/lib/types";
 
-export const metadata: Metadata = { title: "Egzersiz Kütüphanesi" };
+export const metadata: Metadata = { title: "Egzersizlerim" };
 
 type TargetRow = { exercise_id: string; muscle_function_id: string; role: string };
 
-export default async function ExercisesPage() {
-  const coach = await requireCoach();
+export default async function MyExercisesPage() {
+  const profile = await requireProfile();
   const supabase = await createSupabaseServerClient();
 
   const { muscles, functions } = await loadMuscleTaxonomy(supabase);
 
-  // System/community exercises plus the coach's own — not athletes' private ones.
   const { data } = await supabase
     .from("exercises")
     .select("*")
-    .or(`is_system.eq.true,created_by.eq.${coach.id}`)
+    .eq("created_by", profile.id)
+    .eq("is_system", false)
     .order("category", { ascending: true, nullsFirst: false })
     .order("region", { ascending: true, nullsFirst: false })
     .order("name", { ascending: true });
@@ -53,17 +55,24 @@ export default async function ExercisesPage() {
     targets: targetsByExercise.get(e.id) ?? [],
   }));
 
+  const addTrigger = (
+    <Button>
+      <Plus className="size-4" /> Yeni egzersiz
+    </Button>
+  );
+
   return (
     <div>
       <PageHeader
-        title="Egzersiz Kütüphanesi"
-        description="Programlarında kullanacağın egzersizleri buradan yönet. Kategori ve bölgeye göre süzebilirsin."
+        title="Egzersizlerim"
+        description="Kendi egzersizlerini tanımla; programlarında sistem egzersizleriyle birlikte kullan."
       >
         <ExerciseForm
           create={createExercise}
           update={updateExercise}
           muscles={muscles}
           functions={functions}
+          trigger={addTrigger}
         />
       </PageHeader>
 
@@ -74,6 +83,8 @@ export default async function ExercisesPage() {
         create={createExercise}
         update={updateExercise}
         remove={deleteExercise}
+        emptyTitle="Henüz kendi egzersizin yok"
+        emptyDescription="Sistemde olmayan bir hareketi ekle — hedef kasları seçersen raporlar ve muadil önerisi de çalışır."
       />
     </div>
   );

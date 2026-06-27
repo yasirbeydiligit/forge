@@ -12,28 +12,32 @@ import {
   updateWorkout,
   updateWorkoutExercise,
 } from "../actions";
+import { AssignCalendarDialog } from "../assign-calendar-dialog";
 import { ProgramDetail } from "@/components/programs/program-detail";
 import type { ProgramDetailActions } from "@/components/programs/types";
-import { requireCoach } from "@/lib/auth";
+import { requireProfile } from "@/lib/auth";
 import { suggestAlternatives } from "@/lib/exercises/alternatives";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Exercise, Program, WorkoutWithExercises } from "@/lib/types";
 
-export const metadata: Metadata = { title: "Program" };
+export const metadata: Metadata = { title: "Programım" };
 
-export default async function ProgramDetailPage({
+export default async function MyProgramDetailPage({
   params,
 }: {
   params: Promise<{ programId: string }>;
 }) {
-  const coach = await requireCoach();
+  const profile = await requireProfile();
   const { programId } = await params;
   const supabase = await createSupabaseServerClient();
 
+  // Only the athlete's own program — not a community program they happened to
+  // open under this path.
   const { data: program } = await supabase
     .from("programs")
     .select("*")
     .eq("id", programId)
+    .eq("created_by", profile.id)
     .maybeSingle();
   if (!program) notFound();
 
@@ -47,14 +51,16 @@ export default async function ProgramDetailPage({
         ascending: true,
         referencedTable: "workout_exercises",
       }),
+    // RLS returns exactly system + the athlete's own exercises.
     supabase
       .from("exercises")
       .select("*")
-      .or(`is_system.eq.true,created_by.eq.${coach.id}`)
       .order("category", { ascending: true, nullsFirst: false })
       .order("region", { ascending: true, nullsFirst: false })
       .order("name", { ascending: true }),
   ]);
+
+  const workouts = (workoutsData ?? []) as WorkoutWithExercises[];
 
   const actions: ProgramDetailActions = {
     updateProgram,
@@ -72,13 +78,18 @@ export default async function ProgramDetailPage({
   return (
     <ProgramDetail
       program={program as Program}
-      workouts={(workoutsData ?? []) as WorkoutWithExercises[]}
+      workouts={workouts}
       exercises={(exercisesData ?? []) as Exercise[]}
       actions={actions}
-      basePath="/panel/programlar"
-      exerciseLibraryHref="/panel/egzersizler"
-      showPublish
-      showDraftBadge
+      basePath="/programlarim"
+      backLabel="Programlarım"
+      exerciseLibraryHref="/egzersizlerim"
+      headerActions={
+        <AssignCalendarDialog
+          programId={programId}
+          workouts={workouts.map((w) => ({ id: w.id, name: w.name }))}
+        />
+      }
     />
   );
 }

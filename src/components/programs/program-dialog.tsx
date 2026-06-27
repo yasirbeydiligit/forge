@@ -4,7 +4,7 @@ import { useActionState, useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 
-import { createProgram, updateProgram, type FormState } from "./actions";
+import type { FormAction } from "./types";
 import { ImageUpload } from "@/components/image-upload";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,18 +22,29 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import type { Program } from "@/lib/types";
 
+/**
+ * Shared program create/edit dialog. The coach passes showPublish so a program
+ * can be made community-visible; the athlete omits it (personal programs are
+ * always private, enforced server-side + by RLS).
+ */
 export function ProgramDialog({
+  create,
+  update,
   program,
   trigger,
+  showPublish = false,
 }: {
+  create?: FormAction;
+  update: FormAction;
   program?: Program;
   trigger?: React.ReactNode;
+  showPublish?: boolean;
 }) {
   const isEdit = Boolean(program);
   const [open, setOpen] = useState(false);
   const [published, setPublished] = useState(program?.is_published ?? true);
-  const [state, formAction, isPending] = useActionState<FormState, FormData>(
-    isEdit ? updateProgram : createProgram,
+  const [state, formAction, isPending] = useActionState(
+    isEdit ? update : (create ?? update),
     {},
   );
 
@@ -66,11 +77,13 @@ export function ProgramDialog({
 
         <form action={formAction} className="space-y-4">
           {isEdit ? <input type="hidden" name="id" value={program!.id} /> : null}
-          <input
-            type="hidden"
-            name="isPublished"
-            value={published ? "true" : "false"}
-          />
+          {showPublish ? (
+            <input
+              type="hidden"
+              name="isPublished"
+              value={published ? "true" : "false"}
+            />
+          ) : null}
 
           <div className="space-y-2">
             <Label htmlFor="name">Program adı</Label>
@@ -99,19 +112,21 @@ export function ProgramDialog({
             <ImageUpload name="coverUrl" defaultValue={program?.cover_url ?? ""} />
           </div>
 
-          <div className="flex items-center justify-between rounded-lg border border-border p-3">
-            <div className="space-y-0.5">
-              <Label htmlFor="published">Yayında</Label>
-              <p className="text-xs text-muted-foreground">
-                Sporcular yalnızca yayındaki programlara kaydolabilir.
-              </p>
+          {showPublish ? (
+            <div className="flex items-center justify-between rounded-lg border border-border p-3">
+              <div className="space-y-0.5">
+                <Label htmlFor="published">Yayında</Label>
+                <p className="text-xs text-muted-foreground">
+                  Sporcular yalnızca yayındaki programlara kaydolabilir.
+                </p>
+              </div>
+              <Switch
+                id="published"
+                checked={published}
+                onCheckedChange={setPublished}
+              />
             </div>
-            <Switch
-              id="published"
-              checked={published}
-              onCheckedChange={setPublished}
-            />
-          </div>
+          ) : null}
 
           <DialogFooter>
             <Button type="submit" disabled={isPending}>

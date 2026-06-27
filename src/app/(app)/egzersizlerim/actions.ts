@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { requireCoach } from "@/lib/auth";
+import { requireProfile } from "@/lib/auth";
 import {
   createExerciseFromForm,
   updateExerciseFromForm,
@@ -16,14 +16,14 @@ export async function createExercise(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const coach = await requireCoach();
-  // Coach-authored exercises join the shared system/community library.
+  const profile = await requireProfile();
+  // Athlete-authored exercises stay private (owner + coach read-only via RLS).
   const res = await createExerciseFromForm({
-    userId: coach.id,
-    isSystem: true,
+    userId: profile.id,
+    isSystem: false,
     formData,
   });
-  if (res.ok) revalidatePath("/panel/egzersizler");
+  if (res.ok) revalidatePath("/egzersizlerim");
   return res;
 }
 
@@ -31,18 +31,18 @@ export async function updateExercise(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await requireCoach();
+  await requireProfile();
   const res = await updateExerciseFromForm({ formData });
-  if (res.ok) revalidatePath("/panel/egzersizler");
+  if (res.ok) revalidatePath("/egzersizlerim");
   return res;
 }
 
 export async function deleteExercise(formData: FormData): Promise<void> {
-  await requireCoach();
+  await requireProfile();
   const id = String(formData.get("id") ?? "");
   if (!id) return;
 
   const supabase = await createSupabaseServerClient();
   await supabase.from("exercises").delete().eq("id", id);
-  revalidatePath("/panel/egzersizler");
+  revalidatePath("/egzersizlerim");
 }
