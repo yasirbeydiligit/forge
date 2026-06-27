@@ -22,12 +22,30 @@ function set(o: Partial<CoachWeekSet> = {}): CoachWeekSet {
     weight: 100,
     reps: 5,
     rir: 2,
+    region: null,
     performedAt: "2026-06-22T10:00:00.000Z",
     createdAt: "2026-06-22T10:00:00.000Z",
     targets: [target("quads", "quads-knee-extension", "primary")],
     ...o,
   };
 }
+
+describe("buildCoachWeekly — region breakdown", () => {
+  it("breaks a muscle's primary sets down by exercise region", () => {
+    const chest = (s: Partial<CoachWeekSet>) =>
+      set({ targets: [target("chest", "chest-horizontal-adduction", "primary")], ...s });
+    const report = buildCoachWeekly([
+      chest({ exerciseId: "incline", exerciseName: "Incline", region: "Üst Göğüs" }),
+      chest({ exerciseId: "incline", exerciseName: "Incline", region: "Üst Göğüs" }),
+      chest({ exerciseId: "pecdeck", exerciseName: "Pec Deck", region: "Orta Göğüs" }),
+    ]);
+    const m = report.muscles.find((x) => x.muscleSlug === "chest")!;
+    expect(m.regions).toEqual([
+      { region: "Üst Göğüs", primarySets: 2 },
+      { region: "Orta Göğüs", primarySets: 1 },
+    ]);
+  });
+});
 
 describe("buildCoachWeekly — muscle grouping", () => {
   it("groups sets per muscle and lists the exercises that trained it", () => {

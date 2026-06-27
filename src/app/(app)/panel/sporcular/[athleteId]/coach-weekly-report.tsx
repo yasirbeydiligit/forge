@@ -3,6 +3,7 @@ import { AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { formatRest } from "@/lib/format";
 import type { CoachWeeklyReport } from "@/lib/reports/coach-weekly";
+import { regionShade } from "@/lib/reports/report-colors";
 
 type Plateaus = Record<string, { stalled: boolean; sessions: number }>;
 
@@ -71,6 +72,23 @@ export function CoachWeeklyReportView({
                   {m.secondarySets > 0 ? ` · +${m.secondarySets} ikincil` : ""}
                 </span>
               </div>
+              {m.regions.length > 0 ? (
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border/60 bg-secondary/20 px-3 py-1.5 text-[11px] text-muted-foreground">
+                  {m.regions.map((r, i) => (
+                    <span key={r.region} className="inline-flex items-center gap-1.5">
+                      <span
+                        className="size-2 rounded-[2px]"
+                        style={{ background: regionShade(m.muscleSlug, i, m.regions.length) }}
+                        aria-hidden
+                      />
+                      {r.region}
+                      <span className="font-mono tabular-nums font-medium text-foreground">
+                        {r.primarySets}
+                      </span>
+                    </span>
+                  ))}
+                </div>
+              ) : null}
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border text-[10px] uppercase tracking-wider text-muted-foreground">

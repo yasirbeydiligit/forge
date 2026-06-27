@@ -36,7 +36,7 @@ type SetRow = {
   performed_at: string | null;
   created_at: string;
   exercise_id: string;
-  exercise: { name: string; exercise_muscle_targets: TargetRow[] } | null;
+  exercise: { name: string; region: string | null; exercise_muscle_targets: TargetRow[] } | null;
 };
 
 export type CoachWeeklyResult = {
@@ -63,7 +63,7 @@ function toTargets(rows: TargetRow[]): TargetRef[] {
 }
 
 const SET_SELECT =
-  "session_id, weight, reps, rir, performed_at, created_at, exercise_id, exercise:exercises(name, exercise_muscle_targets(role, muscle_functions(slug, name_tr, muscles(slug, name_tr))))";
+  "session_id, weight, reps, rir, performed_at, created_at, exercise_id, exercise:exercises(name, region, exercise_muscle_targets(role, muscle_functions(slug, name_tr, muscles(slug, name_tr))))";
 
 export async function loadCoachWeekly(
   supabase: Client,
@@ -101,6 +101,7 @@ export async function loadCoachWeekly(
     weight: r.weight != null ? Number(r.weight) : null,
     reps: r.reps,
     rir: r.rir != null ? Number(r.rir) : null,
+    region: r.exercise?.region ?? null,
     performedAt: r.performed_at,
     createdAt: r.created_at,
     targets: toTargets(r.exercise?.exercise_muscle_targets ?? []),

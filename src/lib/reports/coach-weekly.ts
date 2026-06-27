@@ -10,7 +10,7 @@
  */
 import { round1 } from "@/lib/format";
 
-import type { TargetRef } from "./session-report";
+import type { RegionVolume, TargetRef } from "./session-report";
 
 export type CoachWeekSet = {
   sessionId: string;
@@ -20,6 +20,7 @@ export type CoachWeekSet = {
   weight: number | null;
   reps: number | null;
   rir: number | null;
+  region: string | null;
   performedAt: string | null;
   createdAt: string;
   targets: TargetRef[];
@@ -42,6 +43,8 @@ export type CoachMuscle = {
   muscleNameTr: string;
   primarySets: number;
   secondarySets: number;
+  /** Primary sets broken down by exercise region (sorted desc); [] if none. */
+  regions: RegionVolume[];
   exercises: CoachExercise[];
 };
 
@@ -117,6 +120,7 @@ export function buildCoachWeekly(sets: CoachWeekSet[]): CoachWeeklyReport {
     muscleNameTr: string;
     primarySets: number;
     secondarySets: number;
+    regions: Map<string, number>;
     exercises: Map<string, ExAcc>;
   };
   const muscles = new Map<string, MuscleAcc>();
@@ -141,12 +145,15 @@ export function buildCoachWeekly(sets: CoachWeekSet[]): CoachWeeklyReport {
           muscleNameTr: names.get(slug)!,
           primarySets: 0,
           secondarySets: 0,
+          regions: new Map(),
           exercises: new Map(),
         };
         muscles.set(slug, m);
       }
-      if (primary.has(slug)) m.primarySets += 1;
-      else m.secondarySets += 1;
+      if (primary.has(slug)) {
+        m.primarySets += 1;
+        if (s.region) m.regions.set(s.region, (m.regions.get(s.region) ?? 0) + 1);
+      } else m.secondarySets += 1;
 
       let ex = m.exercises.get(s.exerciseId);
       if (!ex) {
@@ -176,6 +183,9 @@ export function buildCoachWeekly(sets: CoachWeekSet[]): CoachWeeklyReport {
       muscleNameTr: m.muscleNameTr,
       primarySets: m.primarySets,
       secondarySets: m.secondarySets,
+      regions: [...m.regions.entries()]
+        .map(([region, primarySets]) => ({ region, primarySets }))
+        .sort((a, b) => b.primarySets - a.primarySets),
       exercises: [...m.exercises.values()]
         .map((ex) => {
           const orderVals = [...ex.sessionOrders.values()];
