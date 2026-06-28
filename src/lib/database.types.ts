@@ -847,6 +847,50 @@ export type Database = {
           },
         ]
       }
+      meal_templates: {
+        Row: {
+          athlete_id: string
+          carbs: number | null
+          created_at: string
+          description: string | null
+          fat: number | null
+          id: string
+          kcal: number | null
+          name: string
+          protein: number | null
+        }
+        Insert: {
+          athlete_id: string
+          carbs?: number | null
+          created_at?: string
+          description?: string | null
+          fat?: number | null
+          id?: string
+          kcal?: number | null
+          name: string
+          protein?: number | null
+        }
+        Update: {
+          athlete_id?: string
+          carbs?: number | null
+          created_at?: string
+          description?: string | null
+          fat?: number | null
+          id?: string
+          kcal?: number | null
+          name?: string
+          protein?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meal_templates_athlete_id_profiles_id_fk"
+            columns: ["athlete_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meals: {
         Row: {
           athlete_id: string
@@ -1065,6 +1109,132 @@ export type Database = {
           },
         ]
       }
+      protocol_assignments: {
+        Row: {
+          assigned_by: string | null
+          athlete_id: string
+          created_at: string
+          id: string
+          protocol_id: string
+        }
+        Insert: {
+          assigned_by?: string | null
+          athlete_id: string
+          created_at?: string
+          id?: string
+          protocol_id: string
+        }
+        Update: {
+          assigned_by?: string | null
+          athlete_id?: string
+          created_at?: string
+          id?: string
+          protocol_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "protocol_assignments_assigned_by_profiles_id_fk"
+            columns: ["assigned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "protocol_assignments_athlete_id_profiles_id_fk"
+            columns: ["athlete_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "protocol_assignments_protocol_id_protocol_templates_id_fk"
+            columns: ["protocol_id"]
+            isOneToOne: false
+            referencedRelation: "protocol_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      protocol_completions: {
+        Row: {
+          athlete_id: string
+          completed_at: string
+          completion_date: string
+          id: string
+          protocol_id: string
+        }
+        Insert: {
+          athlete_id: string
+          completed_at?: string
+          completion_date: string
+          id?: string
+          protocol_id: string
+        }
+        Update: {
+          athlete_id?: string
+          completed_at?: string
+          completion_date?: string
+          id?: string
+          protocol_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "protocol_completions_athlete_id_profiles_id_fk"
+            columns: ["athlete_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "protocol_completions_protocol_id_protocol_templates_id_fk"
+            columns: ["protocol_id"]
+            isOneToOne: false
+            referencedRelation: "protocol_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      protocol_templates: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          instructions: string | null
+          is_active: boolean
+          name: string
+          order_index: number
+          timing: Database["public"]["Enums"]["protocol_timing"]
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          instructions?: string | null
+          is_active?: boolean
+          name: string
+          order_index?: number
+          timing: Database["public"]["Enums"]["protocol_timing"]
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          instructions?: string | null
+          is_active?: boolean
+          name?: string
+          order_index?: number
+          timing?: Database["public"]["Enums"]["protocol_timing"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "protocol_templates_created_by_profiles_id_fk"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workout_exercises: {
         Row: {
           created_at: string
@@ -1231,6 +1401,12 @@ export type Database = {
         | "core"
         | "rotation"
       muscle_region: "upper" | "lower" | "core"
+      protocol_timing:
+        | "morning"
+        | "pre_workout"
+        | "intra_workout"
+        | "post_workout"
+        | "night"
       user_role: "coach" | "athlete"
     }
     CompositeTypes: {
@@ -1390,6 +1566,13 @@ export const Constants = {
         "rotation",
       ],
       muscle_region: ["upper", "lower", "core"],
+      protocol_timing: [
+        "morning",
+        "pre_workout",
+        "intra_workout",
+        "post_workout",
+        "night",
+      ],
       user_role: ["coach", "athlete"],
     },
   },

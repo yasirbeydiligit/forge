@@ -19,6 +19,10 @@ export type FeedLike = Tables<"feed_likes">;
 export type DailyMetric = Tables<"daily_metrics">;
 export type NutritionTarget = Tables<"nutrition_targets">;
 export type Meal = Tables<"meals">;
+export type MealTemplate = Tables<"meal_templates">;
+export type ProtocolTemplate = Tables<"protocol_templates">;
+export type ProtocolAssignment = Tables<"protocol_assignments">;
+export type ProtocolCompletion = Tables<"protocol_completions">;
 
 /** A workout_exercise joined with its library exercise. */
 export type WorkoutExerciseWithExercise = WorkoutExercise & {
