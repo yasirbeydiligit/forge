@@ -8,6 +8,7 @@ import {
   ClipboardList,
   Dumbbell,
   Flame,
+  FlaskConical,
   LayoutDashboard,
   Library,
   LineChart,
@@ -50,6 +51,7 @@ function buildNav(profile: Profile, unansweredCount: number) {
     ];
     const secondary: NavItem[] = [
       { href: "/panel/egzersizler", label: "Egzersiz Kütüphanesi", icon: Flame },
+      { href: "/panel/protokoller", label: "Protokoller", icon: FlaskConical },
       { href: "/panel/kutuphane", label: "Kütüphane Yönetimi", icon: Library },
       { href: "/kutuphane", label: "Kütüphane", icon: BookOpen },
       { href: "/panel/davetler", label: "Davetler", icon: Send },

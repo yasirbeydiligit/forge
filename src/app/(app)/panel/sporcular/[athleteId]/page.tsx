@@ -2,16 +2,29 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { addWeeks, endOfWeek, format, parseISO, startOfWeek } from "date-fns";
-import { Activity, ArrowLeft, ChevronRight, Dumbbell, NotebookPen } from "lucide-react";
+import {
+  Activity,
+  ArrowLeft,
+  ChevronRight,
+  Dumbbell,
+  FlaskConical,
+  NotebookPen,
+} from "lucide-react";
 
+import { toggleAssignment } from "../../protokoller/actions";
 import { EmptyState } from "@/components/empty-state";
 import { SessionView, type SessionRow } from "@/components/logbook/session-view";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { requireCoach } from "@/lib/auth";
 import { formatDate, formatNumber, getInitials } from "@/lib/format";
+import {
+  PROTOCOL_TIMING_LABEL_TR,
+  sortByTiming,
+  type ProtocolTiming,
+} from "@/lib/nutrition/protocols";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { DailyMetric } from "@/lib/types";
+import type { DailyMetric, ProtocolTemplate } from "@/lib/types";
 
 import { loadCoachWeekly } from "./coach-weekly-loader";
 import { CoachWeeklyReportView } from "./coach-weekly-report";
@@ -53,6 +66,8 @@ export default async function AthleteDetailPage({
     { data: ownProgramsData },
     { data: sessionsData },
     { data: metricsData },
+    { data: protocolData },
+    { data: athleteAssignmentData },
     weekly,
     nutritionWeekly,
   ] = await Promise.all([
@@ -80,6 +95,15 @@ export default async function AthleteDetailPage({
         .eq("athlete_id", athleteId)
         .order("metric_date", { ascending: false })
         .limit(10),
+      supabase
+        .from("protocol_templates")
+        .select("*")
+        .eq("is_active", true)
+        .order("order_index", { ascending: true }),
+      supabase
+        .from("protocol_assignments")
+        .select("protocol_id")
+        .eq("athlete_id", athleteId),
       loadCoachWeekly(supabase, athleteId, weekStart, weekEnd),
       loadNutritionWeekly(supabase, athleteId, weekStart, weekEnd),
     ]);
@@ -102,6 +126,11 @@ export default async function AthleteDetailPage({
     description: string | null;
     workouts: { count: number }[];
   }[];
+
+  const protocols = sortByTiming((protocolData ?? []) as ProtocolTemplate[]);
+  const assignedIds = new Set(
+    (athleteAssignmentData ?? []).map((a) => a.protocol_id),
+  );
 
   return (
     <div className="space-y-6">
@@ -195,6 +224,72 @@ export default async function AthleteDetailPage({
         prevHref={prevHref}
         nextHref={nextHref}
       />
+
+      <section className="space-y-3">
+        <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          <FlaskConical className="size-4" /> Protokol atamaları
+        </h2>
+        {protocols.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Aktif protokol yok.{" "}
+            <Link href="/panel/protokoller" className="text-lab-green hover:underline">
+              Protokol oluştur
+            </Link>
+            .
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {protocols.map((p) => {
+              const assigned = assignedIds.has(p.id);
+              return (
+                <div
+                  key={p.id}
+                  className="flex items-center gap-3 rounded-xl border border-border p-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-foreground">
+                        {p.name}
+                      </span>
+                      <Badge
+                        variant="secondary"
+                        className="rounded-full text-[11px]"
+                      >
+                        {PROTOCOL_TIMING_LABEL_TR[p.timing as ProtocolTiming] ??
+                          p.timing}
+                      </Badge>
+                    </div>
+                    {p.instructions ? (
+                      <p className="mt-0.5 truncate text-sm text-muted-foreground">
+                        {p.instructions}
+                      </p>
+                    ) : null}
+                  </div>
+                  <form action={toggleAssignment} className="shrink-0">
+                    <input type="hidden" name="protocolId" value={p.id} />
+                    <input type="hidden" name="athleteId" value={athleteId} />
+                    <input
+                      type="hidden"
+                      name="assigned"
+                      value={assigned ? "0" : "1"}
+                    />
+                    <button
+                      type="submit"
+                      className={
+                        assigned
+                          ? "rounded-md border border-lab-green/40 bg-lab-green/10 px-3 py-1.5 text-xs font-medium text-lab-green transition-colors hover:bg-lab-green/15"
+                          : "rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                      }
+                    >
+                      {assigned ? "Atandı ✓" : "Ata"}
+                    </button>
+                  </form>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
 
       {metrics.length > 0 ? (
         <section className="space-y-3">
