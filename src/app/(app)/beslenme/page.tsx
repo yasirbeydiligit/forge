@@ -20,7 +20,7 @@ import { requireProfile } from "@/lib/auth";
 import { formatDate, toDateKey } from "@/lib/format";
 import { getAthleteInsights } from "@/lib/rag/insights-server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { Meal, NutritionTarget } from "@/lib/types";
+import type { Meal, MealTemplate, NutritionTarget } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Beslenme" };
 
@@ -43,31 +43,41 @@ export default async function NutritionPage({
   const nextKey = toDateKey(addDays(date, 1));
 
   const supabase = await createSupabaseServerClient();
-  const [{ data: targetData }, { data: mealsData }, { data: metricData }] =
-    await Promise.all([
-      supabase
-        .from("nutrition_targets")
-        .select("*")
-        .eq("athlete_id", profile.id)
-        .maybeSingle(),
-      supabase
-        .from("meals")
-        .select("*")
-        .eq("athlete_id", profile.id)
-        .eq("meal_date", dateKey)
-        .order("eaten_at", { ascending: true, nullsFirst: false })
-        .order("created_at", { ascending: true }),
-      supabase
-        .from("daily_metrics")
-        .select("water_ml")
-        .eq("athlete_id", profile.id)
-        .eq("metric_date", dateKey)
-        .maybeSingle(),
-    ]);
+  const [
+    { data: targetData },
+    { data: mealsData },
+    { data: metricData },
+    { data: templateData },
+  ] = await Promise.all([
+    supabase
+      .from("nutrition_targets")
+      .select("*")
+      .eq("athlete_id", profile.id)
+      .maybeSingle(),
+    supabase
+      .from("meals")
+      .select("*")
+      .eq("athlete_id", profile.id)
+      .eq("meal_date", dateKey)
+      .order("eaten_at", { ascending: true, nullsFirst: false })
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("daily_metrics")
+      .select("water_ml")
+      .eq("athlete_id", profile.id)
+      .eq("metric_date", dateKey)
+      .maybeSingle(),
+    supabase
+      .from("meal_templates")
+      .select("*")
+      .eq("athlete_id", profile.id)
+      .order("name", { ascending: true }),
+  ]);
 
   const target = targetData as NutritionTarget | null;
   const meals = (mealsData ?? []) as Meal[];
   const waterMl = metricData?.water_ml ?? 0;
+  const templates = (templateData ?? []) as MealTemplate[];
 
   const insights = await getAthleteInsights(supabase, profile.id, "nutrition");
 
@@ -98,8 +108,11 @@ export default async function NutritionPage({
           </Button>
         </div>
         <div className="flex gap-2">
+          <Button asChild variant="outline" size="sm">
+            <Link href="/beslenme/hazir-ogunler">Hazır öğünlerim</Link>
+          </Button>
           <TargetsDialog target={target} />
-          <MealDialog date={dateKey} />
+          <MealDialog date={dateKey} templates={templates} />
         </div>
       </div>
 

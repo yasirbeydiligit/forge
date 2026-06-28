@@ -30,9 +30,11 @@ const toNum = (s: string) => (s.trim() === "" ? null : Number(s));
 export function MealFields({
   initial,
   showSaveAsTemplate = false,
+  showTime = true,
 }: {
   initial?: MealFieldsInitial;
   showSaveAsTemplate?: boolean;
+  showTime?: boolean;
 }) {
   const [protein, setProtein] = useState(numStr(initial?.protein));
   const [carbs, setCarbs] = useState(numStr(initial?.carbs));
@@ -50,7 +52,9 @@ export function MealFields({
 
   return (
     <>
-      <div className="grid grid-cols-[1fr_7rem] gap-3">
+      <div
+        className={showTime ? "grid grid-cols-[1fr_7rem] gap-3" : undefined}
+      >
         <div className="space-y-2">
           <Label htmlFor="name">Öğün</Label>
           <Input
@@ -62,15 +66,17 @@ export function MealFields({
             defaultValue={initial?.name ?? ""}
           />
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="eatenAt">Saat</Label>
-          <Input
-            id="eatenAt"
-            name="eatenAt"
-            type="time"
-            defaultValue={initial?.eatenAt ?? ""}
-          />
-        </div>
+        {showTime ? (
+          <div className="space-y-2">
+            <Label htmlFor="eatenAt">Saat</Label>
+            <Input
+              id="eatenAt"
+              name="eatenAt"
+              type="time"
+              defaultValue={initial?.eatenAt ?? ""}
+            />
+          </div>
+        ) : null}
       </div>
 
       <div className="space-y-2">

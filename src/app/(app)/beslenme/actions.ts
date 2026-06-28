@@ -23,6 +23,7 @@ const int = (max: number) =>
 
 function revalidate() {
   revalidatePath("/beslenme");
+  revalidatePath("/beslenme/hazir-ogunler");
   revalidatePath("/bugun");
 }
 
@@ -160,6 +161,19 @@ export async function addMeal(
   });
   if (error) return { error: "Öğün eklenemedi." };
 
+  // Optionally remember this meal in the athlete's saved-meal library.
+  if (formData.get("saveAsTemplate") === "on") {
+    await supabase.from("meal_templates").insert({
+      athlete_id: profile.id,
+      name: d.name,
+      description: d.description || null,
+      kcal: d.kcal,
+      protein: d.protein,
+      carbs: d.carbs,
+      fat: d.fat,
+    });
+  }
+
   revalidate();
   return { ok: true };
 }
@@ -170,5 +184,65 @@ export async function deleteMeal(formData: FormData): Promise<void> {
   if (!id) return;
   const supabase = await createSupabaseServerClient();
   await supabase.from("meals").delete().eq("id", id);
+  revalidate();
+}
+
+/* ----------------------------- Meal templates ----------------------------- */
+
+const mealTemplateSchema = z.object({
+  name: z.string().trim().min(1, "Öğün adı gerekli."),
+  description: z.string().trim().max(280).optional().nullable(),
+  kcal: int(15000),
+  protein: int(1000),
+  carbs: int(2000),
+  fat: int(1000),
+});
+
+export async function updateMealTemplate(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  await requireProfile();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return { error: "Kayıt bulunamadı." };
+
+  const parsed = mealTemplateSchema.safeParse({
+    name: formData.get("name"),
+    description: formData.get("description") || null,
+    kcal: formData.get("kcal"),
+    protein: formData.get("protein"),
+    carbs: formData.get("carbs"),
+    fat: formData.get("fat"),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Form geçersiz." };
+  }
+  const d = parsed.data;
+
+  const supabase = await createSupabaseServerClient();
+  // RLS limits the update to the owner's own row.
+  const { error } = await supabase
+    .from("meal_templates")
+    .update({
+      name: d.name,
+      description: d.description || null,
+      kcal: d.kcal,
+      protein: d.protein,
+      carbs: d.carbs,
+      fat: d.fat,
+    })
+    .eq("id", id);
+  if (error) return { error: "Hazır öğün güncellenemedi." };
+
+  revalidate();
+  return { ok: true };
+}
+
+export async function deleteMealTemplate(formData: FormData): Promise<void> {
+  await requireProfile();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+  const supabase = await createSupabaseServerClient();
+  await supabase.from("meal_templates").delete().eq("id", id);
   revalidate();
 }
