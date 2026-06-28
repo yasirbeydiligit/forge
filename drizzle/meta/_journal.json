@@ -134,6 +134,13 @@
       "when": 1782384413991,
       "tag": "0018_lowly_doomsday",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1782664663339,
+      "tag": "0021_nutrition_protocols",
+      "breakpoints": true
     }
   ]
 }
