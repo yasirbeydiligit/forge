@@ -246,3 +246,48 @@ export async function deleteMealTemplate(formData: FormData): Promise<void> {
   await supabase.from("meal_templates").delete().eq("id", id);
   revalidate();
 }
+
+/* ------------------------------- Protocols -------------------------------- */
+
+const toggleSchema = z.object({
+  protocolId: z.string().uuid(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  done: z.enum(["0", "1"]),
+});
+
+/**
+ * Mark (or clear) an assigned protocol as completed on a given day. Presence of
+ * a protocol_completions row == done. RLS guarantees the athlete can only write
+ * their own completions for a protocol currently assigned to them.
+ */
+export async function toggleProtocol(formData: FormData): Promise<void> {
+  const profile = await requireProfile();
+  const parsed = toggleSchema.safeParse({
+    protocolId: formData.get("protocolId"),
+    date: formData.get("date"),
+    done: formData.get("done"),
+  });
+  if (!parsed.success) return;
+  const { protocolId, date, done } = parsed.data;
+
+  const supabase = await createSupabaseServerClient();
+  if (done === "1") {
+    await supabase.from("protocol_completions").upsert(
+      {
+        protocol_id: protocolId,
+        athlete_id: profile.id,
+        completion_date: date,
+      },
+      { onConflict: "protocol_id,athlete_id,completion_date" },
+    );
+  } else {
+    await supabase
+      .from("protocol_completions")
+      .delete()
+      .eq("protocol_id", protocolId)
+      .eq("athlete_id", profile.id)
+      .eq("completion_date", date);
+  }
+
+  revalidate();
+}

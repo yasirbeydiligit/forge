@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Trash2, UtensilsCrossed } from "lucide-react
 
 import { deleteMeal } from "./actions";
 import { MealDialog } from "./meal-dialog";
+import { ProtocolChecklist, type ProtocolItem } from "./protocol-checklist";
 import { TargetsDialog } from "./targets-dialog";
 import { WaterTracker } from "./water-tracker";
 import {
@@ -48,6 +49,8 @@ export default async function NutritionPage({
     { data: mealsData },
     { data: metricData },
     { data: templateData },
+    { data: assignmentData },
+    { data: completionData },
   ] = await Promise.all([
     supabase
       .from("nutrition_targets")
@@ -72,12 +75,40 @@ export default async function NutritionPage({
       .select("*")
       .eq("athlete_id", profile.id)
       .order("name", { ascending: true }),
+    supabase
+      .from("protocol_assignments")
+      .select(
+        "protocol:protocol_templates(id, name, timing, instructions, order_index, is_active)",
+      )
+      .eq("athlete_id", profile.id),
+    supabase
+      .from("protocol_completions")
+      .select("protocol_id, completed_at")
+      .eq("athlete_id", profile.id)
+      .eq("completion_date", dateKey),
   ]);
 
   const target = targetData as NutritionTarget | null;
   const meals = (mealsData ?? []) as Meal[];
   const waterMl = metricData?.water_ml ?? 0;
   const templates = (templateData ?? []) as MealTemplate[];
+
+  // Assigned, still-active protocols, joined with today's completions.
+  const completionByProtocol = new Map(
+    (completionData ?? []).map((c) => [c.protocol_id, c.completed_at]),
+  );
+  const protocols: ProtocolItem[] = (assignmentData ?? [])
+    .map((a) => a.protocol)
+    .filter((p): p is NonNullable<typeof p> => p != null && p.is_active)
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      timing: p.timing,
+      instructions: p.instructions,
+      order_index: p.order_index,
+      done: completionByProtocol.has(p.id),
+      completedAt: completionByProtocol.get(p.id) ?? null,
+    }));
 
   const insights = await getAthleteInsights(supabase, profile.id, "nutrition");
 
@@ -173,6 +204,12 @@ export default async function NutritionPage({
           target={target?.water_ml ?? null}
         />
       </div>
+
+      {protocols.length > 0 ? (
+        <div className="mt-4">
+          <ProtocolChecklist date={dateKey} protocols={protocols} />
+        </div>
+      ) : null}
 
       <InsightNotes insights={insights} className="mt-4 space-y-3" />
 
