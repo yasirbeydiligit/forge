@@ -99,6 +99,18 @@ export const exerciseMuscleRole = pgEnum("exercise_muscle_role", [
   "secondary",
 ]);
 
+/**
+ * Time-of-day slot for a coach-defined supplement/timing protocol. Ordered as a
+ * day timeline (display order + Turkish labels live in src/lib/nutrition/protocols.ts).
+ */
+export const protocolTiming = pgEnum("protocol_timing", [
+  "morning",
+  "pre_workout",
+  "intra_workout",
+  "post_workout",
+  "night",
+]);
+
 /* -------------------------------------------------------------------------- */
 /*  Identity                                                                  */
 /* -------------------------------------------------------------------------- */
@@ -617,6 +629,121 @@ export const meals = pgTable(
       .defaultNow(),
   },
   (t) => [index("meals_athlete_date_idx").on(t.athleteId, t.mealDate)],
+);
+
+/**
+ * Athlete-owned saved meals ("hazır öğün"): a one-tap re-add library with
+ * optional portion scaling. Owner-only (coach has no access); see 0022 RLS.
+ */
+export const mealTemplates = pgTable(
+  "meal_templates",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    athleteId: uuid("athlete_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    description: text("description"),
+    kcal: integer("kcal"),
+    protein: integer("protein"),
+    carbs: integer("carbs"),
+    fat: integer("fat"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("meal_templates_athlete_idx").on(t.athleteId)],
+);
+
+/* -------------------------------------------------------------------------- */
+/*  Supplement / timing protocols (compliance — deliberately NOT macros)      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A coach-defined protocol bound to a time-of-day slot (e.g. "Pre: 5g kreatin +
+ * 200mg kafein"). Shown to assigned athletes as a daily checkable box. is_active
+ * soft-archives without losing history.
+ */
+export const protocolTemplates = pgTable(
+  "protocol_templates",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    name: text("name").notNull(),
+    timing: protocolTiming("timing").notNull(),
+    instructions: text("instructions"),
+    orderIndex: integer("order_index").notNull().default(0),
+    isActive: boolean("is_active").notNull().default(true),
+    createdBy: uuid("created_by").references(() => profiles.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("protocol_templates_active_idx").on(
+      t.isActive,
+      t.timing,
+      t.orderIndex,
+    ),
+  ],
+);
+
+/** Links a protocol template to a specific athlete (coach assigns). */
+export const protocolAssignments = pgTable(
+  "protocol_assignments",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    protocolId: uuid("protocol_id")
+      .notNull()
+      .references(() => protocolTemplates.id, { onDelete: "cascade" }),
+    athleteId: uuid("athlete_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    assignedBy: uuid("assigned_by").references(() => profiles.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    unique("protocol_assignments_unique").on(t.protocolId, t.athleteId),
+    index("protocol_assignments_athlete_idx").on(t.athleteId),
+  ],
+);
+
+/**
+ * Athlete checked off a protocol on a given day. One row per
+ * (protocol, athlete, day); presence == done. Athlete owns; coach reads
+ * (compliance). Writing is gated by an active assignment in 0022 RLS.
+ */
+export const protocolCompletions = pgTable(
+  "protocol_completions",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    protocolId: uuid("protocol_id")
+      .notNull()
+      .references(() => protocolTemplates.id, { onDelete: "cascade" }),
+    athleteId: uuid("athlete_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    completionDate: date("completion_date").notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    unique("protocol_completions_unique").on(
+      t.protocolId,
+      t.athleteId,
+      t.completionDate,
+    ),
+    index("protocol_completions_athlete_date_idx").on(
+      t.athleteId,
+      t.completionDate,
+    ),
+  ],
 );
 
 /* -------------------------------------------------------------------------- */
