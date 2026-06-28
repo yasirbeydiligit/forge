@@ -574,6 +574,7 @@ export const dailyMetrics = pgTable(
     energy: integer("energy"),
     hunger: integer("hunger"),
     adherence: integer("adherence"),
+    digestion: integer("digestion"),
     waterMl: integer("water_ml"),
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -585,6 +586,26 @@ export const dailyMetrics = pgTable(
     index("daily_metrics_athlete_date_idx").on(t.athleteId, t.metricDate),
   ],
 );
+
+/**
+ * Per-athlete tracker preferences: which metric columns are shown, in what
+ * order (the `enabled` array's order), and any optional goals used as the
+ * colouring center. Metric *definitions* live in code (`src/lib/metrics.ts`);
+ * this only stores the athlete's choices. One row per athlete; the page falls
+ * back to a sensible default when no row exists.
+ */
+export const trackerSettings = pgTable("tracker_settings", {
+  athleteId: uuid("athlete_id")
+    .primaryKey()
+    .references(() => profiles.id, { onDelete: "cascade" }),
+  // Ordered list of enabled metric keys, e.g. ["weight","sleep_hours",...].
+  enabled: jsonb("enabled").notNull(),
+  // Map of metric key -> goal value, e.g. { "sleep_hours": 8, "weight": 78 }.
+  goals: jsonb("goals").notNull().default(sql`'{}'::jsonb`),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
 
 /* -------------------------------------------------------------------------- */
 /*  Nutrition                                                                 */

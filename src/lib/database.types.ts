@@ -78,6 +78,7 @@ export type Database = {
           adherence: number | null
           athlete_id: string
           created_at: string
+          digestion: number | null
           energy: number | null
           hunger: number | null
           id: string
@@ -92,6 +93,7 @@ export type Database = {
           adherence?: number | null
           athlete_id: string
           created_at?: string
+          digestion?: number | null
           energy?: number | null
           hunger?: number | null
           id?: string
@@ -106,6 +108,7 @@ export type Database = {
           adherence?: number | null
           athlete_id?: string
           created_at?: string
+          digestion?: number | null
           energy?: number | null
           hunger?: number | null
           id?: string
@@ -1230,6 +1233,35 @@ export type Database = {
             foreignKeyName: "protocol_templates_created_by_profiles_id_fk"
             columns: ["created_by"]
             isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tracker_settings: {
+        Row: {
+          athlete_id: string
+          enabled: Json
+          goals: Json
+          updated_at: string
+        }
+        Insert: {
+          athlete_id: string
+          enabled: Json
+          goals?: Json
+          updated_at?: string
+        }
+        Update: {
+          athlete_id?: string
+          enabled?: Json
+          goals?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tracker_settings_athlete_id_profiles_id_fk"
+            columns: ["athlete_id"]
+            isOneToOne: true
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },

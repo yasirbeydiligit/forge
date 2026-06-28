@@ -44,6 +44,7 @@
   --color-paper-border: var(--paper-border);
   --color-lab-green: var(--lab-green);
   --color-lab-amber: var(--lab-amber);
+  --color-lab-rose: var(--lab-rose);
   --color-lab-violet: var(--lab-violet);
   --color-lab-link: var(--lab-link);
   --color-lab-ink: var(--lab-ink);
@@ -119,6 +120,9 @@
   --paper-border: oklch(0.89 0.01 85);
   --lab-green: oklch(0.5 0.1 155);
   --lab-amber: oklch(0.58 0.12 65);
+  /* Calm terracotta for the "below baseline / needs attention" valence. Muted
+   * enough to sit on cream paper without alarming — pairs with lab-green. */
+  --lab-rose: oklch(0.55 0.13 27);
   --lab-violet: oklch(0.5 0.11 290);
   --lab-link: oklch(0.5 0.13 250);
   /* Calm editorial blue for the "training" research domain (brief: mavi =

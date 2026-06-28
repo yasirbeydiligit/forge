@@ -3,60 +3,95 @@
 import { useRef, useState, useTransition } from "react";
 
 import { saveDailyMetric } from "./actions";
+import {
+  TrendMark,
+  VALENCE_CELL,
+  VALENCE_TEXT,
+  ValenceMark,
+} from "./valence-ui";
+import {
+  getMetric,
+  trend,
+  valence,
+  type MetricKey,
+  type Polarity,
+} from "@/lib/metrics";
 import type { DailyMetric } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-type Vals = {
-  weight: string;
-  sleepHours: string;
-  restingHr: string;
-  energy: string;
-  hunger: string;
-  adherence: string;
-  notes: string;
+/** Per-cell colouring context computed on the server from the athlete's
+ * baseline + goals. `center` is the goal (if set) or the recent mean. */
+export type CellConfig = {
+  polarity: Polarity;
+  center: number | null;
+  spread: number;
 };
+
+/** Every storable metric, kept in state even when its column is hidden, so
+ * toggling a column off never wipes its stored value on the next save. */
+const ALL_KEYS: MetricKey[] = [
+  "weight",
+  "sleep_hours",
+  "resting_hr",
+  "energy",
+  "hunger",
+  "adherence",
+  "digestion",
+  "notes",
+];
+
+/** MetricKey → the camelCase field name the save action expects. */
+const FIELD: Record<MetricKey, string> = {
+  weight: "weight",
+  sleep_hours: "sleepHours",
+  resting_hr: "restingHr",
+  energy: "energy",
+  hunger: "hunger",
+  adherence: "adherence",
+  digestion: "digestion",
+  notes: "notes",
+};
+
+/** Cell input width per metric (UI concern, kept out of the registry). */
+const CELL_WIDTH: Record<MetricKey, string> = {
+  weight: "w-16",
+  sleep_hours: "w-14",
+  resting_hr: "w-12",
+  energy: "w-11",
+  hunger: "w-11",
+  adherence: "w-11",
+  digestion: "w-11",
+  notes: "w-full px-2 text-left",
+};
+
+type Vals = Record<MetricKey, string>;
 
 function toVals(m: DailyMetric | null): Vals {
-  return {
-    weight: m?.weight != null ? String(m.weight) : "",
-    sleepHours: m?.sleep_hours != null ? String(m.sleep_hours) : "",
-    restingHr: m?.resting_hr != null ? String(m.resting_hr) : "",
-    energy: m?.energy != null ? String(m.energy) : "",
-    hunger: m?.hunger != null ? String(m.hunger) : "",
-    adherence: m?.adherence != null ? String(m.adherence) : "",
-    notes: m?.notes ?? "",
-  };
+  const out = {} as Vals;
+  for (const key of ALL_KEYS) {
+    const v = m?.[key];
+    out[key] = v != null ? String(v) : "";
+  }
+  return out;
 }
-
-const cellInput =
-  "h-9 rounded bg-transparent text-center font-mono text-sm tabular-nums text-foreground outline-none transition-colors focus:bg-primary/5";
-
-// Valid ranges per metric; values are clamped to these on blur.
-const RANGE: Record<keyof Vals, [number, number] | null> = {
-  weight: [0, 300],
-  sleepHours: [0, 24],
-  restingHr: [0, 250],
-  energy: [0, 10],
-  hunger: [0, 10],
-  adherence: [0, 10],
-  notes: null,
-};
 
 function clampVals(v: Vals): Vals {
   const out: Vals = { ...v };
-  (Object.keys(RANGE) as (keyof Vals)[]).forEach((k) => {
-    const r = RANGE[k];
-    if (!r || out[k] === "") return;
-    const n = Number(out[k]);
+  for (const key of ALL_KEYS) {
+    const range = getMetric(key).range;
+    if (!range || out[key] === "") continue;
+    const n = Number(out[key]);
     if (Number.isNaN(n)) {
-      out[k] = "";
-      return;
+      out[key] = "";
+      continue;
     }
-    const clamped = Math.min(Math.max(n, r[0]), r[1]);
-    out[k] = String(clamped);
-  });
+    out[key] = String(Math.min(Math.max(n, range[0]), range[1]));
+  }
   return out;
 }
+
+const cellInput =
+  "h-9 rounded bg-transparent text-center font-mono text-sm tabular-nums outline-none transition-colors focus:bg-primary/5";
 
 export function MetricRow({
   date,
@@ -64,12 +99,17 @@ export function MetricRow({
   dayNum,
   isToday,
   metric,
+  columns,
+  configs,
 }: {
   date: string;
   dayLabel: string;
   dayNum: number;
   isToday: boolean;
   metric: DailyMetric | null;
+  /** Enabled metric keys, in display order (notes handled separately). */
+  columns: MetricKey[];
+  configs: Partial<Record<MetricKey, CellConfig>>;
 }) {
   const [vals, setVals] = useState<Vals>(() => toVals(metric));
   const saved = useRef<Vals>(vals);
@@ -81,21 +121,32 @@ export function MetricRow({
     if (JSON.stringify(next) === JSON.stringify(saved.current)) return;
     const fd = new FormData();
     fd.set("date", date);
-    fd.set("weight", next.weight);
-    fd.set("sleepHours", next.sleepHours);
-    fd.set("restingHr", next.restingHr);
-    fd.set("energy", next.energy);
-    fd.set("hunger", next.hunger);
-    fd.set("adherence", next.adherence);
-    fd.set("notes", next.notes);
+    for (const key of ALL_KEYS) fd.set(FIELD[key], next[key]);
     startTransition(async () => {
       await saveDailyMetric(fd);
       saved.current = next;
     });
   }
 
-  const set = (key: keyof Vals) => (e: React.ChangeEvent<HTMLInputElement>) =>
+  const set = (key: MetricKey) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setVals((v) => ({ ...v, [key]: e.target.value }));
+
+  // Enter moves to the next cell in the row (mobile-friendly fast entry).
+  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const inputs = Array.from(
+      e.currentTarget.closest("tr")?.querySelectorAll("input") ?? [],
+    );
+    const i = inputs.indexOf(e.currentTarget);
+    const nextEl = inputs[i + 1];
+    if (nextEl) nextEl.focus();
+    else e.currentTarget.blur();
+  }
+
+  // Show notes last and separate from the numeric/coloured columns.
+  const numericCols = columns.filter((k) => k !== "notes");
+  const showNotes = columns.includes("notes");
 
   return (
     <tr
@@ -103,84 +154,63 @@ export function MetricRow({
       onBlur={commit}
     >
       <td className="py-1.5 pl-3">
-        <span
-          className={cn("text-sm font-medium", isToday && "text-primary")}
-        >
+        <span className={cn("text-sm font-medium", isToday && "text-primary")}>
           {dayLabel}
         </span>{" "}
         <span className="font-mono text-[10px] text-muted-foreground">
           {dayNum}
         </span>
       </td>
-      <td>
-        <input
-          className={cn(cellInput, "w-16")}
-          inputMode="decimal"
-          placeholder="—"
-          value={vals.weight}
-          onChange={set("weight")}
-          aria-label="Kilo"
-        />
-      </td>
-      <td>
-        <input
-          className={cn(cellInput, "w-14")}
-          inputMode="decimal"
-          placeholder="—"
-          value={vals.sleepHours}
-          onChange={set("sleepHours")}
-          aria-label="Uyku"
-        />
-      </td>
-      <td>
-        <input
-          className={cn(cellInput, "w-12")}
-          inputMode="numeric"
-          placeholder="—"
-          value={vals.restingHr}
-          onChange={set("restingHr")}
-          aria-label="Dinlenik nabız"
-        />
-      </td>
-      <td>
-        <input
-          className={cn(cellInput, "w-11")}
-          inputMode="numeric"
-          placeholder="—"
-          value={vals.energy}
-          onChange={set("energy")}
-          aria-label="Enerji"
-        />
-      </td>
-      <td>
-        <input
-          className={cn(cellInput, "w-11")}
-          inputMode="numeric"
-          placeholder="—"
-          value={vals.hunger}
-          onChange={set("hunger")}
-          aria-label="Açlık"
-        />
-      </td>
-      <td>
-        <input
-          className={cn(cellInput, "w-11")}
-          inputMode="numeric"
-          placeholder="—"
-          value={vals.adherence}
-          onChange={set("adherence")}
-          aria-label="Uyum"
-        />
-      </td>
-      <td className="pr-2">
-        <input
-          className={cn(cellInput, "w-full px-2 text-left")}
-          placeholder="not…"
-          value={vals.notes}
-          onChange={set("notes")}
-          aria-label="Not"
-        />
-      </td>
+
+      {numericCols.map((key) => {
+        const def = getMetric(key);
+        const cfg = configs[key];
+        const raw = vals[key];
+        const n = raw === "" ? null : Number(raw);
+
+        let v: ReturnType<typeof valence> = "none";
+        let t: ReturnType<typeof trend> = "none";
+        if (cfg && n != null && Number.isFinite(n)) {
+          if (cfg.polarity === "trend") t = trend(n, cfg.center);
+          else v = valence(n, cfg);
+        }
+
+        return (
+          <td key={key} className={cn("relative px-0.5", VALENCE_CELL[v])}>
+            <input
+              className={cn(cellInput, CELL_WIDTH[key], VALENCE_TEXT[v])}
+              inputMode={def.inputMode === "text" ? undefined : def.inputMode}
+              enterKeyHint="next"
+              placeholder="—"
+              value={raw}
+              onChange={set(key)}
+              onFocus={(e) => e.currentTarget.select()}
+              onKeyDown={onKeyDown}
+              aria-label={def.label}
+            />
+            <span className="pointer-events-none absolute right-0.5 top-1">
+              {cfg?.polarity === "trend" ? (
+                <TrendMark trend={t} />
+              ) : (
+                <ValenceMark valence={v} />
+              )}
+            </span>
+          </td>
+        );
+      })}
+
+      {showNotes ? (
+        <td className="pr-2">
+          <input
+            className={cn(cellInput, CELL_WIDTH.notes, "text-foreground")}
+            placeholder="not…"
+            value={vals.notes}
+            onChange={set("notes")}
+            onKeyDown={onKeyDown}
+            aria-label="Not"
+          />
+        </td>
+      ) : null}
     </tr>
   );
 }

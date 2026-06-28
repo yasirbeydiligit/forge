@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 const ACCENTS = {
   green: { fg: "text-lab-green", spark: "var(--lab-green)", ring: "ring-lab-green/30 bg-lab-green/[0.05]" },
   amber: { fg: "text-lab-amber", spark: "var(--lab-amber)", ring: "ring-lab-amber/40 bg-lab-amber/[0.06]" },
+  rose: { fg: "text-lab-rose", spark: "var(--lab-rose)", ring: "ring-lab-rose/40 bg-lab-rose/[0.06]" },
   blue: { fg: "text-lab-blue", spark: "var(--lab-blue)", ring: "ring-lab-blue/30 bg-lab-blue/[0.05]" },
   violet: { fg: "text-lab-violet", spark: "var(--lab-violet)", ring: "ring-lab-violet/30 bg-lab-violet/[0.05]" },
 } as const;
