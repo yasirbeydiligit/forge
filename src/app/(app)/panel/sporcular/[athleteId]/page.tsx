@@ -15,6 +15,8 @@ import type { DailyMetric } from "@/lib/types";
 
 import { loadCoachWeekly } from "./coach-weekly-loader";
 import { CoachWeeklyReportView } from "./coach-weekly-report";
+import { loadNutritionWeekly } from "./nutrition-weekly-loader";
+import { NutritionWeeklyReportView } from "./nutrition-weekly-report";
 
 export const metadata: Metadata = { title: "Sporcu" };
 
@@ -52,6 +54,7 @@ export default async function AthleteDetailPage({
     { data: sessionsData },
     { data: metricsData },
     weekly,
+    nutritionWeekly,
   ] = await Promise.all([
       supabase
         .from("enrollments")
@@ -78,6 +81,7 @@ export default async function AthleteDetailPage({
         .order("metric_date", { ascending: false })
         .limit(10),
       loadCoachWeekly(supabase, athleteId, weekStart, weekEnd),
+      loadNutritionWeekly(supabase, athleteId, weekStart, weekEnd),
     ]);
 
   const base = `/panel/sporcular/${athleteId}`;
@@ -180,6 +184,13 @@ export default async function AthleteDetailPage({
       <CoachWeeklyReportView
         report={weekly.report}
         plateaus={weekly.plateaus}
+        weekLabel={weekLabel}
+        prevHref={prevHref}
+        nextHref={nextHref}
+      />
+
+      <NutritionWeeklyReportView
+        report={nutritionWeekly}
         weekLabel={weekLabel}
         prevHref={prevHref}
         nextHref={nextHref}
