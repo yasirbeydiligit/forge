@@ -14,7 +14,7 @@ import {
   SectionLabel,
 } from "@/components/lab/lab";
 import { InsightNotes } from "@/components/library/insight-note";
-import { MacroBar } from "@/components/nutrition/macro-bar";
+import { CalorieBar, MacroBar } from "@/components/nutrition/macro-bar";
 import { Button } from "@/components/ui/button";
 import { requireProfile } from "@/lib/auth";
 import { formatDate, toDateKey } from "@/lib/format";
@@ -137,6 +137,12 @@ export default async function NutritionPage({
           ) : null}
           <span className="ml-1 text-sm font-normal text-paper-muted">kcal</span>
         </p>
+
+        {target?.kcal ? (
+          <div className="mt-3">
+            <CalorieBar value={totalKcal} target={target.kcal} />
+          </div>
+        ) : null}
 
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           <MacroBar

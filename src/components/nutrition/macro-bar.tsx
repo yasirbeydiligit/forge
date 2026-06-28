@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Check } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -10,11 +11,85 @@ const ACCENTS = {
   violet: "bg-lab-violet",
 } as const;
 
+type Accent = keyof typeof ACCENTS;
+type Status = "none" | "under" | "on" | "over";
+
+/**
+ * Classify progress toward a target into a status plus two bar segments: the
+ * accent-coloured part (up to the target) and, when meaningfully over (>110%),
+ * an overshoot part. Within 90–110% counts as on-target.
+ */
+function classify(
+  value: number,
+  target: number | null,
+): { status: Status; pct: number; accentPct: number; overPct: number } {
+  if (!target || target <= 0)
+    return { status: "none", pct: 0, accentPct: 0, overPct: 0 };
+  const ratio = value / target;
+  const pct = Math.round(ratio * 100);
+  if (ratio > 1.1) {
+    return {
+      status: "over",
+      pct,
+      accentPct: (target / value) * 100,
+      overPct: ((value - target) / value) * 100,
+    };
+  }
+  return {
+    status: ratio >= 0.9 ? "on" : "under",
+    pct,
+    accentPct: Math.min(ratio, 1) * 100,
+    overPct: 0,
+  };
+}
+
+/** Animate fills in on mount; the global reduced-motion rule flattens it. */
+function useGrown() {
+  const [grown, setGrown] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setGrown(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+  return grown;
+}
+
+function Bar({
+  accent,
+  accentPct,
+  overPct,
+  grown,
+}: {
+  accent: Accent;
+  accentPct: number;
+  overPct: number;
+  grown: boolean;
+}) {
+  return (
+    <div className="relative h-2 overflow-hidden rounded-full bg-paper-foreground/10">
+      <div
+        className={cn(
+          "absolute inset-y-0 left-0 rounded-full transition-[width] duration-[var(--dur-slow)] ease-soft",
+          ACCENTS[accent],
+        )}
+        style={{ width: `${grown ? accentPct : 0}%` }}
+      />
+      {overPct > 0 ? (
+        <div
+          className="absolute inset-y-0 rounded-full bg-destructive transition-[width,left] duration-[var(--dur-slow)] ease-soft"
+          style={{
+            left: `${grown ? accentPct : 0}%`,
+            width: `${grown ? overPct : 0}%`,
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
 /**
  * A macro progress bar that tells the story by filling, not just by number.
- * Fills from 0 → target ratio on mount (a soft motion-token transition; the
- * global reduced-motion rule flattens it), shows the percentage, and marks an
- * over-target overflow with a deeper cap so going past goal reads at a glance.
+ * Colour-coded by status: accent while under/at target, with a destructive
+ * overshoot segment when meaningfully over. On-target (90–110%) gets a check.
  */
 export function MacroBar({
   label,
@@ -25,19 +100,10 @@ export function MacroBar({
   label: string;
   value: number;
   target: number | null;
-  accent: keyof typeof ACCENTS;
+  accent: Accent;
 }) {
-  const ratio = target && target > 0 ? value / target : 0;
-  const pct = Math.round(ratio * 100);
-  const over = ratio > 1;
-
-  // Animate the fill in on mount: start empty, then grow to the real width.
-  const [grown, setGrown] = useState(false);
-  useEffect(() => {
-    const id = requestAnimationFrame(() => setGrown(true));
-    return () => cancelAnimationFrame(id);
-  }, []);
-  const fill = grown ? Math.min(100, ratio * 100) : 0;
+  const grown = useGrown();
+  const { status, pct, accentPct, overPct } = classify(value, target);
 
   return (
     <div>
@@ -48,25 +114,62 @@ export function MacroBar({
           {target ? <span className="text-paper-muted"> / {target}g</span> : null}
         </span>
       </div>
-      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-paper-foreground/10">
-        <div
-          className={cn(
-            "h-full rounded-full transition-[width] duration-[var(--dur-slow)] ease-soft",
-            ACCENTS[accent],
-            over && "opacity-90",
-          )}
-          style={{ width: `${fill}%` }}
+      <div className="mt-1.5">
+        <Bar
+          accent={accent}
+          accentPct={accentPct}
+          overPct={overPct}
+          grown={grown}
         />
       </div>
-      {target ? (
-        <p className="mt-1 font-mono text-[10px] tabular-nums text-paper-muted">
-          {over ? (
-            <span className="text-paper-foreground">%{pct} · hedefin üzerinde</span>
+      {status !== "none" ? (
+        <p className="mt-1 flex items-center gap-1 font-mono text-[10px] tabular-nums">
+          {status === "over" ? (
+            <span className="text-destructive">
+              %{pct} · {value - (target ?? 0)}g aşım
+            </span>
+          ) : status === "on" ? (
+            <span className="inline-flex items-center gap-0.5 text-lab-green">
+              <Check className="size-2.5" /> %{pct} · tam
+            </span>
           ) : (
-            <span>%{pct}</span>
+            <span className="text-paper-muted">%{pct}</span>
           )}
         </p>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * Total-calorie progress bar for the day. Same status language as MacroBar but
+ * keyed to kcal; the page renders the big serif total above it.
+ */
+export function CalorieBar({
+  value,
+  target,
+}: {
+  value: number;
+  target: number | null;
+}) {
+  const grown = useGrown();
+  const { status, pct, accentPct, overPct } = classify(value, target);
+  if (status === "none") return null;
+
+  return (
+    <div>
+      <Bar accent="green" accentPct={accentPct} overPct={overPct} grown={grown} />
+      <p className="mt-1 font-mono text-[10px] tabular-nums">
+        {status === "over" ? (
+          <span className="text-destructive">
+            %{pct} · {(value - (target ?? 0)).toLocaleString("tr-TR")} kcal aşım
+          </span>
+        ) : status === "on" ? (
+          <span className="text-lab-green">%{pct} · hedefe ulaşıldı</span>
+        ) : (
+          <span className="text-paper-muted">%{pct}</span>
+        )}
+      </p>
     </div>
   );
 }
