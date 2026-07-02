@@ -37,6 +37,7 @@ const ALL_KEYS: MetricKey[] = [
   "hunger",
   "adherence",
   "digestion",
+  "steps",
   "notes",
 ];
 
@@ -49,6 +50,7 @@ const FIELD: Record<MetricKey, string> = {
   hunger: "hunger",
   adherence: "adherence",
   digestion: "digestion",
+  steps: "steps",
   notes: "notes",
 };
 
@@ -61,6 +63,7 @@ const CELL_WIDTH: Record<MetricKey, string> = {
   hunger: "w-11",
   adherence: "w-11",
   digestion: "w-11",
+  steps: "w-16",
   notes: "w-full px-2 text-left",
 };
 
