@@ -306,6 +306,7 @@ export default async function AthleteDetailPage({
                   <th className="px-2 py-2 text-center font-medium">RHR</th>
                   <th className="px-2 py-2 text-center font-medium">Enerji</th>
                   <th className="px-2 py-2 text-center font-medium">Uyum</th>
+                  <th className="px-2 py-2 text-center font-medium">Sindirim</th>
                 </tr>
               </thead>
               <tbody className="font-mono tabular-nums">
@@ -319,6 +320,7 @@ export default async function AthleteDetailPage({
                     <td className="px-2 py-2 text-center">{m.resting_hr ?? "—"}</td>
                     <td className="px-2 py-2 text-center">{m.energy ?? "—"}</td>
                     <td className="px-2 py-2 text-center">{m.adherence ?? "—"}</td>
+                    <td className="px-2 py-2 text-center">{m.digestion ?? "—"}</td>
                   </tr>
                 ))}
               </tbody>
