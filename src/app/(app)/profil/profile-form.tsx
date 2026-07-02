@@ -47,6 +47,27 @@ export function ProfileForm({ profile }: { profile: Profile }) {
       </div>
 
       <div className="space-y-2">
+        <Label htmlFor="username">Kullanıcı adı</Label>
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-sm text-muted-foreground">@</span>
+          <Input
+            id="username"
+            name="username"
+            defaultValue={profile.username ?? ""}
+            placeholder="kullanici_adi"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            maxLength={20}
+            className="font-mono lowercase"
+          />
+        </div>
+        <p className="text-xs text-muted-foreground">
+          3–20 karakter; küçük harf, rakam ve alt çizgi. Boş bırakılabilir.
+        </p>
+      </div>
+
+      <div className="space-y-2">
         <Label htmlFor="email">E-posta</Label>
         <Input id="email" value={profile.email ?? ""} disabled readOnly />
       </div>
