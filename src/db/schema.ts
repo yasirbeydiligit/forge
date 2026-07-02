@@ -111,21 +111,48 @@ export const protocolTiming = pgEnum("protocol_timing", [
   "night",
 ]);
 
+/** Profile enums. Canonical machine values; Turkish labels live in
+ * src/lib/profile.ts (same pattern as the exercise taxonomy). */
+export const userSex = pgEnum("user_sex", ["male", "female"]);
+export const weightUnit = pgEnum("weight_unit", ["kg", "lb"]);
+export const trainingGoal = pgEnum("training_goal", [
+  "muscle_gain",
+  "strength",
+  "fat_loss",
+  "maintenance",
+]);
+
+/** Free-form cardio activity kinds (Turkish labels in src/lib/cardio.ts). */
+export const cardioActivity = pgEnum("cardio_activity", [
+  "walk",
+  "run",
+  "swim",
+  "bike",
+  "elliptical",
+  "other",
+]);
+
 /* -------------------------------------------------------------------------- */
 /*  Identity                                                                  */
 /* -------------------------------------------------------------------------- */
 
-export const profiles = pgTable("profiles", {
-  // Mirrors auth.users.id (FK added in custom migration to auth.users).
-  id: uuid("id").primaryKey(),
-  role: userRole("role").notNull().default("athlete"),
-  fullName: text("full_name").notNull(),
-  avatarUrl: text("avatar_url"),
-  bio: text("bio"),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const profiles = pgTable(
+  "profiles",
+  {
+    // Mirrors auth.users.id (FK added in custom migration to auth.users).
+    id: uuid("id").primaryKey(),
+    role: userRole("role").notNull().default("athlete"),
+    fullName: text("full_name").notNull(),
+    // Optional community handle; format CHECK lives in 0026 (hand SQL).
+    username: text("username"),
+    avatarUrl: text("avatar_url"),
+    bio: text("bio"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [unique("profiles_username_key").on(t.username)],
+);
 
 export const invites = pgTable(
   "invites",
@@ -576,6 +603,8 @@ export const dailyMetrics = pgTable(
     adherence: integer("adherence"),
     digestion: integer("digestion"),
     waterMl: integer("water_ml"),
+    // Daily step count (manual entry today; a future sync can add a source col).
+    steps: integer("steps"),
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -606,6 +635,84 @@ export const trackerSettings = pgTable("tracker_settings", {
     .notNull()
     .defaultNow(),
 });
+
+/* -------------------------------------------------------------------------- */
+/*  Profile details, physique photos & cardio                                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Private per-user profile data. Separate from `profiles` on purpose:
+ * `profiles` is community-readable (the feed needs names/avatars) while these
+ * fields are visible only to the owner and the coach (RLS in 0026).
+ */
+export const profileDetails = pgTable("profile_details", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => profiles.id, { onDelete: "cascade" }),
+  heightCm: integer("height_cm"),
+  birthDate: date("birth_date"),
+  sex: userSex("sex"),
+  // Stored now, UI stays kg-only this phase (see 2026-07-02 design doc).
+  unit: weightUnit("unit").notNull().default("kg"),
+  goal: trainingGoal("goal"),
+  weeklyTargetDays: integer("weekly_target_days"),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+/**
+ * Physique progress photos. The image lives in the private `physique` storage
+ * bucket under `{athlete_id}/{uuid}.{ext}`; this row is the metadata. Highly
+ * sensitive: RLS + storage policies restrict everything to owner + coach.
+ */
+export const physiquePhotos = pgTable(
+  "physique_photos",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    athleteId: uuid("athlete_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    photoDate: date("photo_date").notNull(),
+    storagePath: text("storage_path").notNull(),
+    note: text("note"),
+    weightKg: numeric("weight_kg", { precision: 5, scale: 2 }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    unique("physique_photos_storage_path_key").on(t.storagePath),
+    index("physique_photos_athlete_date_idx").on(t.athleteId, t.photoDate),
+  ],
+);
+
+/**
+ * Free-form cardio entries, deliberately outside the workout-logging flow.
+ * `source` future-proofs for HealthKit-style sync (always 'manual' today).
+ */
+export const cardioSessions = pgTable(
+  "cardio_sessions",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    athleteId: uuid("athlete_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    sessionDate: date("session_date").notNull(),
+    activity: cardioActivity("activity").notNull(),
+    durationMin: integer("duration_min").notNull(),
+    distanceKm: numeric("distance_km", { precision: 6, scale: 2 }),
+    calories: integer("calories"),
+    note: text("note"),
+    source: text("source").notNull().default("manual"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("cardio_sessions_athlete_date_idx").on(t.athleteId, t.sessionDate),
+  ],
+);
 
 /* -------------------------------------------------------------------------- */
 /*  Nutrition                                                                 */
