@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { endOfWeek, getISOWeek, startOfWeek } from "date-fns";
 import {
+  Camera,
   ClipboardList,
   Dumbbell,
   type LucideIcon,
@@ -20,6 +21,7 @@ import { InsightNotes } from "@/components/library/insight-note";
 import { MacroBar } from "@/components/nutrition/macro-bar";
 import { requireProfile } from "@/lib/auth";
 import { formatDate, formatNumber, formatRepRange, toDateKey } from "@/lib/format";
+import { STALE_AFTER_DAYS, daysSince, signPhysiquePaths } from "@/lib/physique";
 import { getAthleteInsights } from "@/lib/rag/insights-server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Meal, NutritionTarget } from "@/lib/types";
@@ -67,6 +69,8 @@ export default async function TodayPage() {
     { count: programCount },
     { data: targetData },
     { data: mealsData },
+    { data: details },
+    { data: lastPhotoData },
   ] = await Promise.all([
     supabase
       .from("calendar_assignments")
@@ -100,7 +104,34 @@ export default async function TodayPage() {
       .select("kcal, protein, carbs, fat")
       .eq("athlete_id", profile.id)
       .eq("meal_date", todayKey),
+    supabase
+      .from("profile_details")
+      .select("weekly_target_days")
+      .eq("user_id", profile.id)
+      .maybeSingle(),
+    supabase
+      .from("physique_photos")
+      .select("photo_date, storage_path")
+      .eq("athlete_id", profile.id)
+      .order("photo_date", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
+
+  // Physique nudge state: latest photo (signed thumb) + how stale it is.
+  const lastPhoto = lastPhotoData as
+    | { photo_date: string; storage_path: string }
+    | null;
+  const photoUrls = lastPhoto
+    ? await signPhysiquePaths(supabase, [lastPhoto.storage_path])
+    : null;
+  const lastPhotoUrl = lastPhoto
+    ? (photoUrls?.get(lastPhoto.storage_path) ?? null)
+    : null;
+  const photoAgeDays = lastPhoto ? daysSince(lastPhoto.photo_date) : null;
+  const photoStale = photoAgeDays != null && photoAgeDays > STALE_AFTER_DAYS;
+  const weeklyTarget = details?.weekly_target_days ?? null;
 
   const target = targetData as NutritionTarget | null;
   const meals = (mealsData ?? []) as Pick<
@@ -291,7 +322,15 @@ export default async function TodayPage() {
             </SectionLabel>
             <p className="mt-1 font-serif text-3xl tabular-nums text-paper-foreground">
               {weekCount ?? 0}
+              {weeklyTarget ? (
+                <span className="text-xl text-paper-muted"> / {weeklyTarget}</span>
+              ) : null}
             </p>
+            {weeklyTarget && (weekCount ?? 0) >= weeklyTarget ? (
+              <p className="mt-1 text-xs font-medium text-lab-green">
+                Haftalık hedef tamam ✓
+              </p>
+            ) : null}
           </PaperCard>
           <PaperCard className="p-4">
             <SectionLabel className="text-paper-muted">
@@ -302,6 +341,46 @@ export default async function TodayPage() {
             </p>
           </PaperCard>
         </div>
+      </section>
+
+      <section className="mt-8 space-y-3">
+        <SectionLabel>Fizik</SectionLabel>
+        <Link href="/fizik" className="block">
+          <PaperCard className="flex flex-row items-center gap-3 p-4 transition-shadow hover:shadow-md">
+            {lastPhotoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={lastPhotoUrl}
+                alt="Son fizik fotoğrafı"
+                className="size-14 shrink-0 rounded-lg border border-paper-border object-cover"
+              />
+            ) : (
+              <span className="flex size-14 shrink-0 items-center justify-center rounded-lg bg-paper-foreground/[0.06] text-lab-green">
+                <Camera className="size-6" />
+              </span>
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-paper-foreground">
+                Fizik güncellemesi
+              </p>
+              <p className="mt-0.5 text-xs text-paper-muted">
+                {lastPhoto == null
+                  ? "İlk fotoğrafını ekle — değişim buradan izlenecek."
+                  : photoAgeDays === 0
+                    ? "Son fotoğraf bugün eklendi."
+                    : `Son fotoğraf ${photoAgeDays} gün önce.`}
+              </p>
+              {photoStale ? (
+                <p className="mt-0.5 text-xs font-medium text-lab-amber">
+                  Güncelleme zamanı — aynı poz, aynı ışık.
+                </p>
+              ) : null}
+            </div>
+            <span className="shrink-0 text-sm font-medium text-lab-link">
+              Aç →
+            </span>
+          </PaperCard>
+        </Link>
       </section>
 
       <section className="mt-8 space-y-3">

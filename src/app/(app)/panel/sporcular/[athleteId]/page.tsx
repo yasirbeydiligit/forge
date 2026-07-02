@@ -5,9 +5,11 @@ import { addWeeks, endOfWeek, format, parseISO, startOfWeek } from "date-fns";
 import {
   Activity,
   ArrowLeft,
+  Camera,
   ChevronRight,
   Dumbbell,
   FlaskConical,
+  HeartPulse,
   NotebookPen,
 } from "lucide-react";
 
@@ -17,14 +19,23 @@ import { SessionView, type SessionRow } from "@/components/logbook/session-view"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { requireCoach } from "@/lib/auth";
+import { CARDIO_LABEL_TR, formatDuration } from "@/lib/cardio";
 import { formatDate, formatNumber, getInitials } from "@/lib/format";
 import {
   PROTOCOL_TIMING_LABEL_TR,
   sortByTiming,
   type ProtocolTiming,
 } from "@/lib/nutrition/protocols";
+import { signPhysiquePaths } from "@/lib/physique";
+import { GOAL_LABEL_TR, ageFrom } from "@/lib/profile";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { DailyMetric, ProtocolTemplate } from "@/lib/types";
+import type {
+  CardioSession,
+  DailyMetric,
+  PhysiquePhoto,
+  ProfileDetails,
+  ProtocolTemplate,
+} from "@/lib/types";
 
 import { loadCoachWeekly } from "./coach-weekly-loader";
 import { CoachWeeklyReportView } from "./coach-weekly-report";
@@ -68,6 +79,9 @@ export default async function AthleteDetailPage({
     { data: metricsData },
     { data: protocolData },
     { data: athleteAssignmentData },
+    { data: detailsData },
+    { data: physiqueData },
+    { data: cardioData },
     weekly,
     nutritionWeekly,
   ] = await Promise.all([
@@ -104,6 +118,25 @@ export default async function AthleteDetailPage({
         .from("protocol_assignments")
         .select("protocol_id")
         .eq("athlete_id", athleteId),
+      supabase
+        .from("profile_details")
+        .select("*")
+        .eq("user_id", athleteId)
+        .maybeSingle(),
+      supabase
+        .from("physique_photos")
+        .select("*")
+        .eq("athlete_id", athleteId)
+        .order("photo_date", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(4),
+      supabase
+        .from("cardio_sessions")
+        .select("*")
+        .eq("athlete_id", athleteId)
+        .order("session_date", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(8),
       loadCoachWeekly(supabase, athleteId, weekStart, weekEnd),
       loadNutritionWeekly(supabase, athleteId, weekStart, weekEnd),
     ]);
@@ -132,6 +165,24 @@ export default async function AthleteDetailPage({
     (athleteAssignmentData ?? []).map((a) => a.protocol_id),
   );
 
+  const details = detailsData as ProfileDetails | null;
+  const cardio = (cardioData ?? []) as CardioSession[];
+  const physique = (physiqueData ?? []) as PhysiquePhoto[];
+  const physiqueUrls = await signPhysiquePaths(
+    supabase,
+    physique.map((p) => p.storage_path),
+  );
+
+  const age = ageFrom(details?.birth_date);
+  const profileMeta = [
+    details?.goal ? GOAL_LABEL_TR[details.goal] : null,
+    details?.weekly_target_days
+      ? `hedef ${details.weekly_target_days} gün/hafta`
+      : null,
+    age != null ? `${age} yaş` : null,
+    details?.height_cm ? `${details.height_cm} cm` : null,
+  ].filter(Boolean);
+
   return (
     <div className="space-y-6">
       <Link
@@ -159,6 +210,11 @@ export default async function AthleteDetailPage({
           ) : (
             <p className="text-sm text-muted-foreground">Sporcu</p>
           )}
+          {profileMeta.length ? (
+            <p className="mt-1 font-mono text-xs tabular-nums text-muted-foreground">
+              {profileMeta.join(" · ")}
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -325,6 +381,96 @@ export default async function AthleteDetailPage({
                     <td className="px-2 py-2 text-center">
                       {m.steps?.toLocaleString("tr-TR") ?? "—"}
                     </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
+
+      {physique.length > 0 ? (
+        <section className="space-y-3">
+          <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            <Camera className="size-4" /> Fizik takip
+          </h2>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {physique.map((p) => {
+              const url = physiqueUrls.get(p.storage_path);
+              if (!url) return null;
+              return (
+                <figure
+                  key={p.id}
+                  className="overflow-hidden rounded-xl border border-border"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={url}
+                    alt={`Fizik — ${formatDate(p.photo_date)}`}
+                    loading="lazy"
+                    className="aspect-[3/4] w-full object-cover"
+                  />
+                  <figcaption className="flex items-baseline justify-between gap-2 p-2 font-mono text-xs tabular-nums">
+                    <span>{formatDate(p.photo_date, "d MMM")}</span>
+                    {p.weight_kg != null ? (
+                      <span className="text-muted-foreground">
+                        {formatNumber(p.weight_kg)} kg
+                      </span>
+                    ) : null}
+                  </figcaption>
+                </figure>
+              );
+            })}
+          </div>
+          <Link
+            href={`/panel/sporcular/${athleteId}/fizik`}
+            className="inline-flex items-center gap-1 text-xs font-medium text-lab-green hover:underline"
+          >
+            Tüm fotoğraflar + karşılaştırma
+            <ChevronRight className="size-3.5" />
+          </Link>
+        </section>
+      ) : null}
+
+      {cardio.length > 0 ? (
+        <section className="space-y-3">
+          <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            <HeartPulse className="size-4" /> Kardiyo
+          </h2>
+          <div className="overflow-x-auto rounded-xl border border-border">
+            <table className="w-full min-w-[26rem] text-sm">
+              <thead>
+                <tr className="border-b border-border text-[10px] uppercase tracking-wider text-muted-foreground">
+                  <th className="px-3 py-2 text-left font-medium">Tarih</th>
+                  <th className="px-2 py-2 text-left font-medium">Aktivite</th>
+                  <th className="px-2 py-2 text-center font-medium">Süre</th>
+                  <th className="px-2 py-2 text-center font-medium">Mesafe</th>
+                  <th className="px-2 py-2 text-center font-medium">Kalori</th>
+                </tr>
+              </thead>
+              <tbody className="font-mono tabular-nums">
+                {cardio.map((c) => (
+                  <tr key={c.id} className="border-b border-border/60 last:border-0">
+                    <td className="px-3 py-2 text-left font-sans text-muted-foreground">
+                      {formatDate(c.session_date, "d MMM")}
+                    </td>
+                    <td className="px-2 py-2 text-left font-sans">
+                      {CARDIO_LABEL_TR[c.activity]}
+                      {c.note ? (
+                        <span className="ml-1.5 text-xs text-muted-foreground">
+                          — {c.note}
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="px-2 py-2 text-center">
+                      {formatDuration(c.duration_min)}
+                    </td>
+                    <td className="px-2 py-2 text-center">
+                      {c.distance_km != null
+                        ? `${formatNumber(c.distance_km)} km`
+                        : "—"}
+                    </td>
+                    <td className="px-2 py-2 text-center">{c.calories ?? "—"}</td>
                   </tr>
                 ))}
               </tbody>
