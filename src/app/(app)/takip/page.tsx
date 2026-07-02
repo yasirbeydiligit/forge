@@ -13,6 +13,7 @@ import {
 import { tr } from "date-fns/locale";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
+import { CardioSection } from "./cardio-section";
 import { MetricRow, type CellConfig } from "./metric-row";
 import { TrackerSettingsDialog } from "./settings-dialog";
 import { LabHeader, LabPage, PaperCard, SectionLabel } from "@/components/lab/lab";
@@ -31,9 +32,10 @@ import {
   weightPolarityForGoal,
   type MetricKey,
 } from "@/lib/metrics";
+import { cardioWeeklySummary, formatDuration, CARDIO_LABEL_TR } from "@/lib/cardio";
 import { getAthleteInsights } from "@/lib/rag/insights-server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { DailyMetric } from "@/lib/types";
+import type { CardioSession, DailyMetric } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Günlük Takip" };
 
@@ -71,7 +73,7 @@ export default async function TrackerPage({
   const supabase = await createSupabaseServerClient();
 
   // One read covers both the visible week and the trailing baseline window.
-  const [{ data: rows }, { data: settings }, { data: details }] =
+  const [{ data: rows }, { data: settings }, { data: details }, { data: cardio }] =
     await Promise.all([
       supabase
         .from("daily_metrics")
@@ -89,6 +91,14 @@ export default async function TrackerPage({
         .select("goal")
         .eq("user_id", profile.id)
         .maybeSingle(),
+      supabase
+        .from("cardio_sessions")
+        .select("*")
+        .eq("athlete_id", profile.id)
+        .gte("session_date", startKey)
+        .lte("session_date", endKey)
+        .order("session_date", { ascending: false })
+        .order("created_at", { ascending: false }),
     ]);
 
   const allRows = (rows ?? []) as DailyMetric[];
@@ -131,6 +141,9 @@ export default async function TrackerPage({
     days
       .map((d) => num(byDate.get(toDateKey(d))?.[key]))
       .filter((v): v is number => v != null);
+
+  const cardioEntries = (cardio ?? []) as CardioSession[];
+  const cardioSummary = cardioWeeklySummary(cardioEntries);
 
   const insights = await getAthleteInsights(supabase, profile.id, "recovery");
 
@@ -197,6 +210,8 @@ export default async function TrackerPage({
         </div>
       </PaperCard>
 
+      <CardioSection entries={cardioEntries} />
+
       <section className="mt-8 space-y-3">
         <SectionLabel>Bu hafta</SectionLabel>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -235,6 +250,25 @@ export default async function TrackerPage({
               />
             );
           })}
+
+          <MeasureCard
+            label="Kardiyo"
+            value={
+              cardioSummary.totalMin > 0
+                ? formatDuration(cardioSummary.totalMin)
+                : "—"
+            }
+            accent="blue"
+            hint={
+              cardioSummary.count > 0
+                ? `${cardioSummary.count} aktivite${
+                    cardioSummary.topActivity
+                      ? ` · en çok ${CARDIO_LABEL_TR[cardioSummary.topActivity].toLowerCase()}`
+                      : ""
+                  }`
+                : undefined
+            }
+          />
         </div>
 
         <InsightNotes insights={insights} className="space-y-3" />

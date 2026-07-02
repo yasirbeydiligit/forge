@@ -7,6 +7,8 @@ import { requireProfile } from "@/lib/auth";
 import { parseGoals, resolveEnabled } from "@/lib/metrics";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+export type FormState = { ok?: boolean; error?: string };
+
 // Coerce to a number (or null) and clamp into [0, max] so out-of-range input
 // is stored at the boundary rather than silently dropped.
 const num = (max: number) =>
@@ -100,6 +102,93 @@ export async function saveTrackerSettings(input: {
     },
     { onConflict: "athlete_id" },
   );
+
+  revalidatePath("/takip");
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Cardio entries                                                            */
+/* -------------------------------------------------------------------------- */
+
+const emptyToNull = (v: unknown) => (v === "" || v == null ? null : v);
+
+const cardioSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Tarih geçersiz."),
+  activity: z.enum(["walk", "run", "swim", "bike", "elliptical", "other"], {
+    message: "Bir aktivite seç.",
+  }),
+  durationMin: z.coerce
+    .number()
+    .int("Süre dakika cinsinden tam sayı olmalı.")
+    .min(1, "Süre en az 1 dakika olmalı.")
+    .max(1440, "Süre 24 saati aşamaz."),
+  distanceKm: z.preprocess(
+    emptyToNull,
+    z.coerce
+      .number()
+      .min(0, "Mesafe negatif olamaz.")
+      .max(500, "Mesafe 500 km'yi aşamaz.")
+      .nullable(),
+  ),
+  calories: z.preprocess(
+    emptyToNull,
+    z.coerce
+      .number()
+      .int()
+      .min(0)
+      .max(10000, "Kalori 10.000'i aşamaz.")
+      .nullable(),
+  ),
+  note: z.string().trim().max(140).optional().nullable(),
+});
+
+export async function saveCardio(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const profile = await requireProfile();
+  const parsed = cardioSchema.safeParse({
+    date: formData.get("date"),
+    activity: formData.get("activity"),
+    durationMin: formData.get("durationMin"),
+    distanceKm: formData.get("distanceKm"),
+    calories: formData.get("calories"),
+    note: formData.get("note") || null,
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Form geçersiz." };
+  }
+  const d = parsed.data;
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.from("cardio_sessions").insert({
+    athlete_id: profile.id,
+    session_date: d.date,
+    activity: d.activity,
+    duration_min: d.durationMin,
+    distance_km: d.distanceKm,
+    calories: d.calories,
+    note: d.note || null,
+    source: "manual",
+  });
+  if (error) return { error: "Kardiyo kaydedilemedi." };
+
+  revalidatePath("/takip");
+  return { ok: true };
+}
+
+export async function deleteCardio(formData: FormData): Promise<void> {
+  const profile = await requireProfile();
+  const id = z.string().uuid().safeParse(formData.get("id"));
+  if (!id.success) return;
+
+  const supabase = await createSupabaseServerClient();
+  // RLS also enforces ownership; the eq is a belt-and-braces filter.
+  await supabase
+    .from("cardio_sessions")
+    .delete()
+    .eq("id", id.data)
+    .eq("athlete_id", profile.id);
 
   revalidatePath("/takip");
 }
