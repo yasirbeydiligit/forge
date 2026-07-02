@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   BookOpen,
   CalendarDays,
+  Camera,
   ClipboardList,
   Dumbbell,
   Flame,
@@ -74,6 +75,7 @@ function buildNav(profile: Profile, unansweredCount: number) {
   ];
   const secondary: NavItem[] = [
     { href: "/beslenme", label: "Beslenme", icon: UtensilsCrossed },
+    { href: "/fizik", label: "Fizik", icon: Camera },
     { href: "/programlar", label: "Programlar", icon: Dumbbell, exact: true },
     { href: "/programlarim", label: "Programlarım", icon: NotebookPen },
     { href: "/egzersizlerim", label: "Egzersizlerim", icon: Dumbbell },
