@@ -87,9 +87,22 @@ function Bar({
 }
 
 /**
+ * Signed remaining amount → Turkish label ("122g kaldı", "24g aşıldı",
+ * "hedefte"). `unit` is "g" for macros or " kcal" for calories, mirroring the
+ * day's kcal "… kaldı / … aşıldı" wording.
+ */
+function remainingLabel(remaining: number, unit: string): string {
+  const n = Math.abs(remaining).toLocaleString("tr-TR");
+  if (remaining > 0) return `${n}${unit} kaldı`;
+  if (remaining < 0) return `${n}${unit} aşıldı`;
+  return "hedefte";
+}
+
+/**
  * A macro progress bar that tells the story by filling, not just by number.
  * Colour-coded by status: accent while under/at target, with a destructive
  * overshoot segment when meaningfully over. On-target (90–110%) gets a check.
+ * The caption shows how much is left ("122g kaldı") or over ("24g aşıldı").
  */
 export function MacroBar({
   label,
@@ -104,6 +117,7 @@ export function MacroBar({
 }) {
   const grown = useGrown();
   const { status, pct, accentPct, overPct } = classify(value, target);
+  const remaining = (target ?? 0) - value;
 
   return (
     <div>
@@ -126,14 +140,16 @@ export function MacroBar({
         <p className="mt-1 flex items-center gap-1 font-mono text-[10px] tabular-nums">
           {status === "over" ? (
             <span className="text-destructive">
-              %{pct} · {value - (target ?? 0)}g aşım
+              %{pct} · {remainingLabel(remaining, "g")}
             </span>
           ) : status === "on" ? (
             <span className="inline-flex items-center gap-0.5 text-lab-green">
-              <Check className="size-2.5" /> %{pct} · tam
+              <Check className="size-2.5" /> %{pct} · {remainingLabel(remaining, "g")}
             </span>
           ) : (
-            <span className="text-paper-muted">%{pct}</span>
+            <span className="text-paper-muted">
+              %{pct} · {remainingLabel(remaining, "g")}
+            </span>
           )}
         </p>
       ) : null}
@@ -154,6 +170,7 @@ export function CalorieBar({
 }) {
   const grown = useGrown();
   const { status, pct, accentPct, overPct } = classify(value, target);
+  const remaining = (target ?? 0) - value;
   if (status === "none") return null;
 
   return (
@@ -162,7 +179,7 @@ export function CalorieBar({
       <p className="mt-1 font-mono text-[10px] tabular-nums">
         {status === "over" ? (
           <span className="text-destructive">
-            %{pct} · {(value - (target ?? 0)).toLocaleString("tr-TR")} kcal aşım
+            %{pct} · {remainingLabel(remaining, " kcal")}
           </span>
         ) : status === "on" ? (
           <span className="text-lab-green">%{pct} · hedefe ulaşıldı</span>
