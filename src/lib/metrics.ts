@@ -20,6 +20,7 @@ export type MetricKey =
   | "hunger"
   | "adherence"
   | "digestion"
+  | "steps"
   | "notes";
 
 /**
@@ -142,6 +143,18 @@ export const METRICS: MetricDef[] = [
     inputMode: "numeric",
   },
   {
+    key: "steps",
+    label: "Adım",
+    short: "Adım",
+    unit: null,
+    range: [0, 100000],
+    decimals: 0,
+    polarity: "higherBetter",
+    goalAllowed: true,
+    spreadFloor: 1000,
+    inputMode: "numeric",
+  },
+  {
     key: "notes",
     label: "Not",
     short: "Not",
@@ -169,8 +182,8 @@ function isMetricKey(value: unknown): value is MetricKey {
 
 /**
  * The columns shown when an athlete has never opened the settings dialog: the
- * pre-feature set (so nothing disappears for existing users). Digestion is
- * opt-in.
+ * pre-feature set (so nothing disappears for existing users) plus steps —
+ * default-on as a headline daily-entry feature. Digestion stays opt-in.
  */
 export const DEFAULT_ENABLED: MetricKey[] = [
   "weight",
@@ -179,6 +192,7 @@ export const DEFAULT_ENABLED: MetricKey[] = [
   "energy",
   "hunger",
   "adherence",
+  "steps",
   "notes",
 ];
 
@@ -285,6 +299,25 @@ export function valence(value: number, input: ValenceInput): Valence {
   const above = delta > 0;
   const isGood = polarity === "higherBetter" ? above : !above;
   return isGood ? "good" : "bad";
+}
+
+/**
+ * Training goals (from the athlete's profile preference) that give the weight
+ * trend a direction: fat_loss → losing reads good, muscle_gain → gaining reads
+ * good. Anything else keeps weight as an unjudged trend (arrow only).
+ */
+export type TrainingGoal =
+  | "muscle_gain"
+  | "strength"
+  | "fat_loss"
+  | "maintenance";
+
+export function weightPolarityForGoal(
+  goal: TrainingGoal | null | undefined,
+): Polarity {
+  if (goal === "fat_loss") return "lowerBetter";
+  if (goal === "muscle_gain") return "higherBetter";
+  return "trend";
 }
 
 export type Trend = "up" | "down" | "flat" | "none";

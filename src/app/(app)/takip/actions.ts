@@ -29,6 +29,7 @@ const schema = z.object({
   hunger: num(10),
   adherence: num(10),
   digestion: num(10),
+  steps: num(100000),
   notes: z.string().trim().max(140).optional().nullable(),
 });
 
@@ -43,6 +44,7 @@ export async function saveDailyMetric(formData: FormData): Promise<void> {
     hunger: formData.get("hunger"),
     adherence: formData.get("adherence"),
     digestion: formData.get("digestion"),
+    steps: formData.get("steps"),
     notes: formData.get("notes") || null,
   });
   if (!parsed.success) return;
@@ -60,6 +62,7 @@ export async function saveDailyMetric(formData: FormData): Promise<void> {
       hunger: d.hunger == null ? null : Math.round(d.hunger),
       adherence: d.adherence == null ? null : Math.round(d.adherence),
       digestion: d.digestion == null ? null : Math.round(d.digestion),
+      steps: d.steps == null ? null : Math.round(d.steps),
       notes: d.notes || null,
     },
     { onConflict: "athlete_id,metric_date" },

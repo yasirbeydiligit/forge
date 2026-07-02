@@ -11,6 +11,7 @@ import {
   resolveEnabled,
   trend,
   valence,
+  weightPolarityForGoal,
 } from "./metrics";
 
 describe("METRICS registry", () => {
@@ -32,6 +33,36 @@ describe("METRICS registry", () => {
   it("lists every metric key exactly once", () => {
     const keys = METRICS.map((m) => m.key);
     expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it("registers steps as a higher-better goalable integer metric", () => {
+    const def = getMetric("steps");
+    expect(def.polarity).toBe("higherBetter");
+    expect(def.goalAllowed).toBe(true);
+    expect(def.range).toEqual([0, 100000]);
+    expect(def.decimals).toBe(0);
+  });
+
+  it("includes steps in the default column set", () => {
+    expect(DEFAULT_ENABLED).toContain("steps");
+  });
+
+  it("keeps steps in resolveEnabled round-trips (canonical order)", () => {
+    expect(resolveEnabled(["steps", "weight"])).toEqual(["weight", "steps"]);
+  });
+});
+
+describe("weightPolarityForGoal", () => {
+  it("judges direction for directional goals", () => {
+    expect(weightPolarityForGoal("fat_loss")).toBe("lowerBetter");
+    expect(weightPolarityForGoal("muscle_gain")).toBe("higherBetter");
+  });
+
+  it("stays trend-only otherwise", () => {
+    expect(weightPolarityForGoal("strength")).toBe("trend");
+    expect(weightPolarityForGoal("maintenance")).toBe("trend");
+    expect(weightPolarityForGoal(null)).toBe("trend");
+    expect(weightPolarityForGoal(undefined)).toBe("trend");
   });
 });
 

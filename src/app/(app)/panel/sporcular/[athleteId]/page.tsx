@@ -307,6 +307,7 @@ export default async function AthleteDetailPage({
                   <th className="px-2 py-2 text-center font-medium">Enerji</th>
                   <th className="px-2 py-2 text-center font-medium">Uyum</th>
                   <th className="px-2 py-2 text-center font-medium">Sindirim</th>
+                  <th className="px-2 py-2 text-center font-medium">Adım</th>
                 </tr>
               </thead>
               <tbody className="font-mono tabular-nums">
@@ -321,6 +322,9 @@ export default async function AthleteDetailPage({
                     <td className="px-2 py-2 text-center">{m.energy ?? "—"}</td>
                     <td className="px-2 py-2 text-center">{m.adherence ?? "—"}</td>
                     <td className="px-2 py-2 text-center">{m.digestion ?? "—"}</td>
+                    <td className="px-2 py-2 text-center">
+                      {m.steps?.toLocaleString("tr-TR") ?? "—"}
+                    </td>
                   </tr>
                 ))}
               </tbody>

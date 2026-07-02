@@ -28,6 +28,7 @@ import {
   parseGoals,
   resolveEnabled,
   valence,
+  weightPolarityForGoal,
   type MetricKey,
 } from "@/lib/metrics";
 import { getAthleteInsights } from "@/lib/rag/insights-server";
@@ -42,8 +43,9 @@ const BASELINE_WINDOW_DAYS = 28;
 const num = (v: unknown): number | null =>
   v != null && Number.isFinite(Number(v)) ? Number(v) : null;
 
-/** Average value cards show 1 decimal, except resting HR which is whole bpm. */
+/** Average value cards show 1 decimal, except whole-number metrics. */
 function formatAvg(key: MetricKey, n: number): string {
+  if (key === "steps") return Math.round(n).toLocaleString("tr-TR");
   return key === "resting_hr" ? String(Math.round(n)) : n.toFixed(1);
 }
 
@@ -69,19 +71,25 @@ export default async function TrackerPage({
   const supabase = await createSupabaseServerClient();
 
   // One read covers both the visible week and the trailing baseline window.
-  const [{ data: rows }, { data: settings }] = await Promise.all([
-    supabase
-      .from("daily_metrics")
-      .select("*")
-      .eq("athlete_id", profile.id)
-      .gte("metric_date", baselineStartKey)
-      .lte("metric_date", endKey),
-    supabase
-      .from("tracker_settings")
-      .select("enabled, goals")
-      .eq("athlete_id", profile.id)
-      .maybeSingle(),
-  ]);
+  const [{ data: rows }, { data: settings }, { data: details }] =
+    await Promise.all([
+      supabase
+        .from("daily_metrics")
+        .select("*")
+        .eq("athlete_id", profile.id)
+        .gte("metric_date", baselineStartKey)
+        .lte("metric_date", endKey),
+      supabase
+        .from("tracker_settings")
+        .select("enabled, goals")
+        .eq("athlete_id", profile.id)
+        .maybeSingle(),
+      supabase
+        .from("profile_details")
+        .select("goal")
+        .eq("user_id", profile.id)
+        .maybeSingle(),
+    ]);
 
   const allRows = (rows ?? []) as DailyMetric[];
   const weekRows = allRows.filter(
@@ -105,11 +113,18 @@ export default async function TrackerPage({
       .map((m) => num(m[key]))
       .filter((v): v is number => v != null);
     const baseline = computeBaseline(history, def.spreadFloor);
-    configs[key] = {
-      polarity: def.polarity,
-      center: metricCenter(baseline, goals[key]),
-      spread: baseline.spread,
-    };
+    // The profile goal gives weight a direction (fat_loss ↓ good, muscle_gain
+    // ↑ good). Judged against the athlete's own recent mean — "moving the
+    // right way" is the signal, not distance from a target weight.
+    const polarity =
+      key === "weight"
+        ? weightPolarityForGoal(details?.goal ?? null)
+        : def.polarity;
+    const center =
+      key === "weight" && polarity !== "trend"
+        ? baseline.mean
+        : metricCenter(baseline, goals[key]);
+    configs[key] = { polarity, center, spread: baseline.spread };
   }
 
   const weekValues = (key: MetricKey) =>
