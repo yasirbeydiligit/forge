@@ -875,6 +875,39 @@ export const protocolCompletions = pgTable(
 );
 
 /* -------------------------------------------------------------------------- */
+/*  Coach triage                                                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Coach's "görüldü" mark for a derived triage alert. Alerts themselves are
+ * never persisted — they are recomputed from live data on each load (see
+ * src/lib/triage). A dismissal hides one exact (alert_key, fingerprint)
+ * period; when new data changes the fingerprint the alert resurfaces.
+ * Coach-only via RLS (0029).
+ */
+export const alertDismissals = pgTable(
+  "alert_dismissals",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    athleteId: uuid("athlete_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    alertKey: text("alert_key").notNull(),
+    fingerprint: text("fingerprint").notNull(),
+    dismissedBy: uuid("dismissed_by").references(() => profiles.id, {
+      onDelete: "set null",
+    }),
+    dismissedAt: timestamp("dismissed_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    unique("alert_dismissals_unique").on(t.athleteId, t.alertKey, t.fingerprint),
+    index("alert_dismissals_athlete_idx").on(t.athleteId),
+  ],
+);
+
+/* -------------------------------------------------------------------------- */
 /*  Research library (RAG)                                                     */
 /* -------------------------------------------------------------------------- */
 
