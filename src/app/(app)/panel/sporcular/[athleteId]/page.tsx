@@ -6,6 +6,7 @@ import {
   Activity,
   ArrowLeft,
   Camera,
+  ChevronDown,
   ChevronRight,
   Dumbbell,
   FlaskConical,
@@ -48,6 +49,8 @@ import { CoachWeeklyReportView } from "./coach-weekly-report";
 import { loadNutritionWeekly } from "./nutrition-weekly-loader";
 import { NutritionWeeklyReportView } from "./nutrition-weekly-report";
 import { QuickMessage, type QuickMessagePost } from "./quick-message";
+import { loadTrainingProgress } from "./training-progress-loader";
+import { TrainingProgressView } from "./training-progress-view";
 
 export const metadata: Metadata = { title: "Sporcu" };
 
@@ -387,7 +390,8 @@ async function AntrenmanTab({
   nextHref: string;
 }) {
   const supabase = await createSupabaseServerClient();
-  const [weekly, { data: sessionsData }] = await Promise.all([
+  const [progress, weekly, { data: sessionsData }] = await Promise.all([
+    loadTrainingProgress(supabase, athleteId),
     loadCoachWeekly(supabase, athleteId, weekStart, weekEnd),
     supabase
       .from("log_sessions")
@@ -404,6 +408,8 @@ async function AntrenmanTab({
     <div className="space-y-6">
       <TabAlerts triage={triage} athleteId={athleteId} tab="antrenman" />
 
+      <TrainingProgressView report={progress.report} />
+
       <CoachWeeklyReportView
         report={weekly.report}
         plateaus={weekly.plateaus}
@@ -412,32 +418,42 @@ async function AntrenmanTab({
         nextHref={nextHref}
       />
 
-      <section className="space-y-3">
-        <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-          <NotebookPen className="size-4" /> Antrenman geçmişi
-        </h2>
-        {sessions.length === 0 ? (
-          <EmptyState
-            icon={NotebookPen}
-            title="Henüz kayıt yok"
-            description="Bu sporcu henüz logbook'una antrenman işlememiş."
-          />
-        ) : (
-          <div className="space-y-4">
-            {sessions.map((s) => (
-              <div key={s.id} className="space-y-1.5">
-                <SessionView session={s} />
-                <Link
-                  href={`/panel/sporcular/${athleteId}/seans/${s.id}`}
-                  className="inline-flex items-center gap-1 px-1 text-xs font-medium text-lab-green hover:underline"
-                >
-                  Kas raporunu gör
-                  <ChevronRight className="size-3.5" />
-                </Link>
+      {/* Raw set logs stay one click away — the digested reports above are the
+          default reading surface for the coach. */}
+      <section>
+        <details className="group">
+          <summary className="flex cursor-pointer select-none items-center gap-2 rounded-lg px-1 py-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden">
+            <ChevronDown className="size-4 transition-transform duration-[var(--dur-base)] ease-soft group-open:rotate-180" />
+            <NotebookPen className="size-4" /> Ham seans geçmişi
+            <span className="font-mono text-xs normal-case tracking-normal">
+              ({sessions.length})
+            </span>
+          </summary>
+          <div className="mt-3">
+            {sessions.length === 0 ? (
+              <EmptyState
+                icon={NotebookPen}
+                title="Henüz kayıt yok"
+                description="Bu sporcu henüz logbook'una antrenman işlememiş."
+              />
+            ) : (
+              <div className="space-y-4">
+                {sessions.map((s) => (
+                  <div key={s.id} className="space-y-1.5">
+                    <SessionView session={s} />
+                    <Link
+                      href={`/panel/sporcular/${athleteId}/seans/${s.id}`}
+                      className="inline-flex items-center gap-1 px-1 text-xs font-medium text-lab-green hover:underline"
+                    >
+                      Kas raporunu gör
+                      <ChevronRight className="size-3.5" />
+                    </Link>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
-        )}
+        </details>
       </section>
     </div>
   );
