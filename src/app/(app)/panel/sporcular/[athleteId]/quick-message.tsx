@@ -75,13 +75,16 @@ export function QuickMessage({
   athleteId,
   athleteName,
   posts,
+  defaultOpen,
 }: {
   athleteId: string;
   athleteName: string;
   posts: QuickMessagePost[];
+  /** Visual-test hook: render the sheet already open. */
+  defaultOpen?: boolean;
 }) {
   return (
-    <Sheet>
+    <Sheet defaultOpen={defaultOpen}>
       <SheetTrigger asChild>
         <Button variant="outline" size="sm">
           <MessageSquarePlus className="size-4" />

@@ -77,18 +77,21 @@ export function ScoreRing({
           stroke="var(--surface)"
           strokeWidth={stroke}
         />
-        <circle
-          ref={arcRef}
-          cx={size / 2}
-          cy={size / 2}
-          r={r}
-          fill="none"
-          stroke={BAND_COLOR[band]}
-          strokeWidth={stroke}
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={target}
-        />
+        {/* score 0 draws nothing — a rounded cap would leave a stray dot. */}
+        {score > 0 ? (
+          <circle
+            ref={arcRef}
+            cx={size / 2}
+            cy={size / 2}
+            r={r}
+            fill="none"
+            stroke={BAND_COLOR[band]}
+            strokeWidth={stroke}
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={target}
+          />
+        ) : null}
       </svg>
       <span
         ref={numRef}

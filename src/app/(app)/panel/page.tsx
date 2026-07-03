@@ -14,6 +14,7 @@ import { EmptyState } from "@/components/empty-state";
 import { PaperCard, SectionLabel } from "@/components/lab/lab";
 import { MeasureCard } from "@/components/measure-card";
 import { PageHeader } from "@/components/shell/page-header";
+import { DigestBanner } from "@/components/triage/digest-banner";
 import { Button } from "@/components/ui/button";
 import { requireCoach } from "@/lib/auth";
 import { formatRelative } from "@/lib/format";
@@ -102,43 +103,11 @@ export default async function CoachDashboardPage() {
       </div>
 
       {/* Aggregated daily digest — the in-app "notification", no push fatigue. */}
-      <PaperCard
-        className={`flex items-center gap-3 border-l-2 p-4 ${
-          criticalCount > 0
-            ? "border-l-lab-rose"
-            : attentionCount > 0
-              ? "border-l-lab-amber"
-              : "border-l-lab-green"
-        }`}
-      >
-        <TriangleAlert
-          className={`size-5 shrink-0 ${
-            criticalCount > 0
-              ? "text-lab-rose"
-              : attentionCount > 0
-                ? "text-lab-amber"
-                : "text-lab-green"
-          }`}
-        />
-        <p className="font-serif text-[15px] italic text-paper-foreground">
-          {attentionCount > 0 ? (
-            <>
-              Bugün {attentionCount} sporcu dikkat istiyor
-              {criticalCount > 0 ? (
-                <>
-                  {" · "}
-                  <span className="text-lab-rose">
-                    {criticalCount} kritik ({criticalNames.join(", ")})
-                  </span>
-                </>
-              ) : null}
-              .
-            </>
-          ) : (
-            "Bugün dikkat isteyen sporcu yok."
-          )}
-        </p>
-      </PaperCard>
+      <DigestBanner
+        attentionCount={attentionCount}
+        criticalCount={criticalCount}
+        criticalNames={criticalNames}
+      />
 
       <section className="space-y-3">
         <SectionLabel>Triyaj — bugün kiminle ilgilenmelisin</SectionLabel>
