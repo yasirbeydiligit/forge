@@ -121,7 +121,7 @@ export function PhotoUploadDialog({
           <Camera className="size-4" /> Fotoğraf ekle
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Fizik fotoğrafı</DialogTitle>
           <DialogDescription>
@@ -132,13 +132,15 @@ export function PhotoUploadDialog({
         <form ref={formRef} action={formAction} onSubmit={handleSubmit} className="space-y-4">
           <input ref={pathRef} type="hidden" name="storagePath" value="" />
 
+          {/* Height is viewport-capped so the dialog (fields + footer) always
+              fits on screen; the photo itself keeps its natural aspect. */}
           {preview ? (
-            <div className="relative overflow-hidden rounded-xl border border-border">
+            <div className="relative flex max-h-[40dvh] justify-center overflow-hidden rounded-xl border border-border bg-card/40">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={preview}
                 alt="Önizleme"
-                className="aspect-[3/4] w-full object-cover"
+                className="max-h-[40dvh] object-contain"
               />
               <Button
                 type="button"
@@ -157,7 +159,7 @@ export function PhotoUploadDialog({
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
-              className="flex aspect-[3/4] w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-card/40 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+              className="flex h-44 w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-card/40 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground sm:h-52"
             >
               <Camera className="size-6" />
               Fotoğraf seç veya çek
