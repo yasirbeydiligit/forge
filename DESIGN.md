@@ -96,6 +96,10 @@ inline fractal-noise SVG). **Higgsfield asset'i geldiğinde** tek satır:
   kartı; alan→renk (`nutrition→green, recovery→amber, training→blue`).
 - **`EmptyState`** (`src/components/empty-state.tsx`): editöryal boş durum +
   `illustration` slotu.
+- **Triyaj seti** (`src/components/triage/`): `ScoreRing` (GSAP'li serif skor
+  halkası; bant → green/amber/rose), `AlertItem`/`AlertGroups` (uyum = kesikli
+  amber, performans = dolu viyole, kritik = rose; görüldü aksiyonlu),
+  `DigestBanner` (günlük özet bandı). Koç paneli + sporcu detayı kullanır.
 
 ## İkonografi
 
