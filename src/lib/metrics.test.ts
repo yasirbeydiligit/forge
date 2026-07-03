@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import {
+  buildCellConfigs,
   DEFAULT_ENABLED,
   METRICS,
   MIN_BASELINE_SAMPLES,
@@ -197,5 +198,55 @@ describe("trend", () => {
 
   it("is none without a reference", () => {
     expect(trend(80, null)).toBe("none");
+  });
+});
+
+describe("buildCellConfigs", () => {
+  const history = [
+    { sleep_hours: 7, weight: "80.0" },
+    { sleep_hours: 8, weight: "80.5" },
+    { sleep_hours: 7.5, weight: "81.0" },
+    { sleep_hours: 8.5, weight: "80.5" },
+  ];
+
+  it("gives weight a goal-directed polarity centred on the athlete's own mean", () => {
+    const configs = buildCellConfigs({
+      historyRows: history,
+      columns: ["weight"],
+      goals: { weight: 75 }, // explicit goal must NOT override the mean
+      profileGoal: "fat_loss",
+    });
+    expect(configs.weight!.polarity).toBe("lowerBetter");
+    expect(configs.weight!.center).toBeCloseTo(80.5, 5);
+  });
+
+  it("keeps weight as an unjudged trend without a directional goal", () => {
+    const configs = buildCellConfigs({
+      historyRows: history,
+      columns: ["weight"],
+      goals: {},
+      profileGoal: "maintenance",
+    });
+    expect(configs.weight!.polarity).toBe("trend");
+  });
+
+  it("prefers an explicit goal as the center for ordinary metrics", () => {
+    const configs = buildCellConfigs({
+      historyRows: history,
+      columns: ["sleep_hours"],
+      goals: { sleep_hours: 9 },
+      profileGoal: null,
+    });
+    expect(configs.sleep_hours!.center).toBe(9);
+  });
+
+  it("returns a null center when history is too thin and no goal exists", () => {
+    const configs = buildCellConfigs({
+      historyRows: history.slice(0, 2),
+      columns: ["sleep_hours"],
+      goals: {},
+      profileGoal: null,
+    });
+    expect(configs.sleep_hours!.center).toBeNull();
   });
 });

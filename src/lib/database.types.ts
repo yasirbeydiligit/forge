@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      alert_dismissals: {
+        Row: {
+          alert_key: string
+          athlete_id: string
+          dismissed_at: string
+          dismissed_by: string | null
+          fingerprint: string
+          id: string
+        }
+        Insert: {
+          alert_key: string
+          athlete_id: string
+          dismissed_at?: string
+          dismissed_by?: string | null
+          fingerprint: string
+          id?: string
+        }
+        Update: {
+          alert_key?: string
+          athlete_id?: string
+          dismissed_at?: string
+          dismissed_by?: string | null
+          fingerprint?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alert_dismissals_athlete_id_profiles_id_fk"
+            columns: ["athlete_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alert_dismissals_dismissed_by_profiles_id_fk"
+            columns: ["dismissed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       calendar_assignments: {
         Row: {
           athlete_id: string | null

@@ -6,18 +6,23 @@ import {
   Flame,
   MessageSquareWarning,
   Send,
+  TriangleAlert,
   Users,
 } from "lucide-react";
 
 import { EmptyState } from "@/components/empty-state";
-import { PaperCard } from "@/components/lab/lab";
+import { PaperCard, SectionLabel } from "@/components/lab/lab";
 import { MeasureCard } from "@/components/measure-card";
 import { PageHeader } from "@/components/shell/page-header";
+import { DigestBanner } from "@/components/triage/digest-banner";
 import { Button } from "@/components/ui/button";
 import { requireCoach } from "@/lib/auth";
 import { formatRelative } from "@/lib/format";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { loadTriage } from "@/lib/triage/load-triage";
 import type { Invite } from "@/lib/types";
+
+import { TriageBoard } from "./triage-board";
 
 export const metadata: Metadata = { title: "Panel" };
 
@@ -30,6 +35,7 @@ export default async function CoachDashboardPage() {
     { count: programCount },
     { data: invitesData },
     { data: unanswered },
+    triage,
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -44,6 +50,7 @@ export default async function CoachDashboardPage() {
       .eq("answered", false)
       .order("created_at", { ascending: false })
       .limit(6),
+    loadTriage(),
   ]);
 
   const now = Date.now();
@@ -62,6 +69,11 @@ export default async function CoachDashboardPage() {
 
   const firstName = coach.full_name.split(" ")[0];
 
+  const { attentionCount, criticalCount } = triage;
+  const criticalNames = triage.results
+    .filter((r) => r.band === "red")
+    .map((r) => r.fullName);
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -69,7 +81,7 @@ export default async function CoachDashboardPage() {
         description="Topluluğunun özetine göz at ve cevap bekleyen soruları yanıtla."
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <MeasureCard icon={Users} label="Sporcu" value={athleteCount ?? 0} />
         <MeasureCard icon={Dumbbell} label="Program" value={programCount ?? 0} />
         <MeasureCard icon={Send} label="Aktif davet" value={activeInvites} />
@@ -80,7 +92,27 @@ export default async function CoachDashboardPage() {
           accent="amber"
           emphasis={questions.length > 0}
         />
+        <MeasureCard
+          icon={TriangleAlert}
+          label="Dikkat"
+          value={attentionCount}
+          accent="rose"
+          emphasis={attentionCount > 0}
+          hint={criticalCount > 0 ? `${criticalCount} kritik` : undefined}
+        />
       </div>
+
+      {/* Aggregated daily digest — the in-app "notification", no push fatigue. */}
+      <DigestBanner
+        attentionCount={attentionCount}
+        criticalCount={criticalCount}
+        criticalNames={criticalNames}
+      />
+
+      <section className="space-y-3">
+        <SectionLabel>Triyaj — bugün kiminle ilgilenmelisin</SectionLabel>
+        <TriageBoard results={triage.results} />
+      </section>
 
       <section className="space-y-3">
         <div className="flex items-center justify-between">

@@ -333,3 +333,55 @@ export function trend(
   if (Math.abs(delta) <= epsilon) return "flat";
   return delta > 0 ? "up" : "down";
 }
+
+/* -------------------------------------------------------------------------- */
+/*  Cell colouring context                                                    */
+/* -------------------------------------------------------------------------- */
+
+/** Per-cell colouring context: polarity + the center/spread to judge against. */
+export type CellConfig = {
+  polarity: Polarity;
+  center: number | null;
+  spread: number;
+};
+
+/**
+ * Build every enabled metric's colouring context from trailing history rows.
+ * Shared by the athlete tracker and the coach's read-only copy so both colour
+ * a week identically. Weight is special: the profile goal gives it a direction
+ * (fat_loss ↓ good, muscle_gain ↑ good) judged against the athlete's own
+ * recent mean — an explicit weight goal never becomes the center, because
+ * "moving the right way" is the signal, not distance from a target.
+ */
+export function buildCellConfigs(input: {
+  /** Rows strictly BEFORE the shown week (the baseline window). */
+  historyRows: ReadonlyArray<Partial<Record<MetricKey, unknown>>>;
+  /** Numeric columns to build configs for ("notes" is skipped). */
+  columns: MetricKey[];
+  goals: Goals;
+  profileGoal: TrainingGoal | null;
+}): Partial<Record<MetricKey, CellConfig>> {
+  const { historyRows, columns, goals, profileGoal } = input;
+  const configs: Partial<Record<MetricKey, CellConfig>> = {};
+
+  for (const key of columns) {
+    if (key === "notes") continue;
+    const def = getMetric(key);
+    const history = historyRows
+      .map((row) => {
+        const v = row[key];
+        return v != null && Number.isFinite(Number(v)) ? Number(v) : null;
+      })
+      .filter((v): v is number => v != null);
+    const baseline = computeBaseline(history, def.spreadFloor);
+
+    const polarity =
+      key === "weight" ? weightPolarityForGoal(profileGoal) : def.polarity;
+    const center =
+      key === "weight" && polarity !== "trend"
+        ? baseline.mean
+        : metricCenter(baseline, goals[key]);
+    configs[key] = { polarity, center, spread: baseline.spread };
+  }
+  return configs;
+}
