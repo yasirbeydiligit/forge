@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { Check, ChevronLeft, ChevronRight, UtensilsCrossed } from "lucide-react";
+import { Check, UtensilsCrossed } from "lucide-react";
 
 import { formatDate } from "@/lib/format";
 import { PROTOCOL_TIMING_LABEL_TR } from "@/lib/nutrition/protocols";
@@ -13,47 +12,21 @@ import { cn } from "@/lib/utils";
  * Coach weekly nutrition + protocol-compliance view of one athlete. Day by day:
  * the meals (with times), daily macro totals against target (colour-coded hit),
  * and which protocols were completed. Calm editorial table; mono numbers.
+ * Week navigation lives in the page-level WeekSwitcher.
  */
 export function NutritionWeeklyReportView({
   report,
-  weekLabel,
-  prevHref,
-  nextHref,
 }: {
   report: NutritionWeeklyReport;
-  weekLabel: string;
-  prevHref: string;
-  nextHref: string;
 }) {
   const hasAnything =
     report.daysLogged > 0 || report.days.some((d) => d.protocolsTotal > 0);
 
   return (
     <section className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-          <UtensilsCrossed className="size-4" /> Haftalık beslenme
-        </h2>
-        <div className="flex items-center gap-2">
-          <Link
-            href={prevHref}
-            aria-label="Önceki hafta"
-            className="flex size-7 items-center justify-center rounded-md border border-border text-muted-foreground hover:text-foreground"
-          >
-            <ChevronLeft className="size-4" />
-          </Link>
-          <span className="min-w-[8.5rem] text-center font-mono text-xs tabular-nums text-foreground">
-            {weekLabel}
-          </span>
-          <Link
-            href={nextHref}
-            aria-label="Sonraki hafta"
-            className="flex size-7 items-center justify-center rounded-md border border-border text-muted-foreground hover:text-foreground"
-          >
-            <ChevronRight className="size-4" />
-          </Link>
-        </div>
-      </div>
+      <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+        <UtensilsCrossed className="size-4" /> Haftalık beslenme
+      </h2>
 
       {!hasAnything ? (
         <p className="rounded-xl border border-border bg-card px-4 py-6 text-center text-sm text-muted-foreground">

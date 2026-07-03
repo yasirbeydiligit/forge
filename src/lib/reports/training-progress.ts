@@ -214,6 +214,11 @@ export function buildTrainingProgress(
   }
 
   const muscleList: MuscleProgress[] = [...muscles.values()]
+    .sort(
+      (a, b) =>
+        b.sessions - a.sessions ||
+        a.muscleNameTr.localeCompare(b.muscleNameTr, "tr"),
+    )
     .map((m) => ({
       muscleSlug: m.muscleSlug,
       muscleNameTr: m.muscleNameTr,
@@ -227,14 +232,7 @@ export function buildTrainingProgress(
             b.exercises.reduce((n, e) => n + e.sessions, 0) -
             a.exercises.reduce((n, e) => n + e.sessions, 0),
         ),
-      _sessions: m.sessions,
-    }))
-    .sort(
-      (a, b) =>
-        b._sessions - a._sessions ||
-        a.muscleNameTr.localeCompare(b.muscleNameTr, "tr"),
-    )
-    .map(({ _sessions, ...rest }) => rest);
+    }));
 
   return {
     sessionCount: windowDates.size,

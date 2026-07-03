@@ -14,7 +14,7 @@ import { tr } from "date-fns/locale";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { CardioSection } from "./cardio-section";
-import { MetricRow, type CellConfig } from "./metric-row";
+import { MetricRow } from "./metric-row";
 import { TrackerSettingsDialog } from "./settings-dialog";
 import { LabHeader, LabPage, PaperCard, SectionLabel } from "@/components/lab/lab";
 import { InsightNotes } from "@/components/library/insight-note";
@@ -23,13 +23,11 @@ import { Button } from "@/components/ui/button";
 import { requireProfile } from "@/lib/auth";
 import { toDateKey, WEEKDAY_LABELS } from "@/lib/format";
 import {
-  computeBaseline,
+  buildCellConfigs,
   getMetric,
-  metricCenter,
   parseGoals,
   resolveEnabled,
   valence,
-  weightPolarityForGoal,
   type MetricKey,
 } from "@/lib/metrics";
 import { cardioWeeklySummary, formatDuration, CARDIO_LABEL_TR } from "@/lib/cardio";
@@ -116,26 +114,12 @@ export default async function TrackerPage({
   const numericCols = enabled.filter((k) => k !== "notes");
 
   // Per-metric colouring context, computed once from the trailing history.
-  const configs: Partial<Record<MetricKey, CellConfig>> = {};
-  for (const key of numericCols) {
-    const def = getMetric(key);
-    const history = historyRows
-      .map((m) => num(m[key]))
-      .filter((v): v is number => v != null);
-    const baseline = computeBaseline(history, def.spreadFloor);
-    // The profile goal gives weight a direction (fat_loss ↓ good, muscle_gain
-    // ↑ good). Judged against the athlete's own recent mean — "moving the
-    // right way" is the signal, not distance from a target weight.
-    const polarity =
-      key === "weight"
-        ? weightPolarityForGoal(details?.goal ?? null)
-        : def.polarity;
-    const center =
-      key === "weight" && polarity !== "trend"
-        ? baseline.mean
-        : metricCenter(baseline, goals[key]);
-    configs[key] = { polarity, center, spread: baseline.spread };
-  }
+  const configs = buildCellConfigs({
+    historyRows,
+    columns: numericCols,
+    goals,
+    profileGoal: details?.goal ?? null,
+  });
 
   const weekValues = (key: MetricKey) =>
     days

@@ -13,19 +13,15 @@ import {
   getMetric,
   trend,
   valence,
+  type CellConfig,
   type MetricKey,
-  type Polarity,
 } from "@/lib/metrics";
 import type { DailyMetric } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-/** Per-cell colouring context computed on the server from the athlete's
- * baseline + goals. `center` is the goal (if set) or the recent mean. */
-export type CellConfig = {
-  polarity: Polarity;
-  center: number | null;
-  spread: number;
-};
+/** Per-cell colouring context — now built by the shared
+ * `buildCellConfigs` in src/lib/metrics (re-exported for existing imports). */
+export type { CellConfig } from "@/lib/metrics";
 
 /** Every storable metric, kept in state even when its column is hidden, so
  * toggling a column off never wipes its stored value on the next save. */

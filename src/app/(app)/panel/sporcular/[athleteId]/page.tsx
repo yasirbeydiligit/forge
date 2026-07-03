@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { addWeeks, endOfWeek, format, parseISO, startOfWeek } from "date-fns";
+import { addWeeks, endOfWeek, format, parseISO, startOfWeek, subDays } from "date-fns";
 import {
   Activity,
   ArrowLeft,
@@ -10,7 +10,6 @@ import {
   ChevronRight,
   Dumbbell,
   FlaskConical,
-  HeartPulse,
   NotebookPen,
 } from "lucide-react";
 
@@ -22,8 +21,8 @@ import { AlertGroups } from "@/components/triage/alert-item";
 import { ScoreRing } from "@/components/triage/score-ring";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { WeekSwitcher } from "@/components/week-switcher";
 import { requireCoach } from "@/lib/auth";
-import { CARDIO_LABEL_TR, formatDuration } from "@/lib/cardio";
 import { formatDate, formatNumber, formatRelative, getInitials } from "@/lib/format";
 import {
   PROTOCOL_TIMING_LABEL_TR,
@@ -49,6 +48,7 @@ import { CoachWeeklyReportView } from "./coach-weekly-report";
 import { loadNutritionWeekly } from "./nutrition-weekly-loader";
 import { NutritionWeeklyReportView } from "./nutrition-weekly-report";
 import { QuickMessage, type QuickMessagePost } from "./quick-message";
+import { CoachTrackerWeek } from "./tracker-week-view";
 import { loadTrainingProgress } from "./training-progress-loader";
 import { TrainingProgressView } from "./training-progress-view";
 
@@ -65,6 +65,14 @@ const TAB_LABEL: Record<Tab, string> = {
   beslenme: "Beslenme",
   takip: "Takip",
   fizik: "Fizik",
+};
+
+type WeekNav = {
+  weekLabel: string;
+  prevHref: string;
+  nextHref: string;
+  currentHref: string;
+  isCurrentWeek: boolean;
 };
 
 export default async function AthleteDetailPage({
@@ -130,9 +138,16 @@ export default async function AthleteDetailPage({
   const base = `/panel/sporcular/${athleteId}`;
   const weekQS = week ? `&week=${week}` : "";
   const tabHref = (t: Tab) => `${base}?tab=${t}${weekQS}`;
-  const prevHref = `${base}?tab=${tab}&week=${format(addWeeks(weekStartD, -1), "yyyy-MM-dd")}`;
-  const nextHref = `${base}?tab=${tab}&week=${format(addWeeks(weekStartD, 1), "yyyy-MM-dd")}`;
   const weekLabel = `${format(weekStartD, "d MMM")} – ${format(weekEndD, "d MMM")}`;
+  const isCurrentWeek =
+    weekStart === format(startOfWeek(new Date(), { weekStartsOn: 1 }), "yyyy-MM-dd");
+  const weekNav = {
+    weekLabel,
+    prevHref: `${base}?tab=${tab}&week=${format(addWeeks(weekStartD, -1), "yyyy-MM-dd")}`,
+    nextHref: `${base}?tab=${tab}&week=${format(addWeeks(weekStartD, 1), "yyyy-MM-dd")}`,
+    currentHref: `${base}?tab=${tab}`,
+    isCurrentWeek,
+  };
 
   const alertCountFor = (t: Tab) =>
     triage?.alerts.filter((a) => a.tab === (t as AlertTab)).length ?? 0;
@@ -221,9 +236,7 @@ export default async function AthleteDetailPage({
           triage={triage}
           weekStart={weekStart}
           weekEnd={weekEnd}
-          weekLabel={weekLabel}
-          prevHref={prevHref}
-          nextHref={nextHref}
+          weekNav={weekNav}
         />
       ) : null}
       {tab === "beslenme" ? (
@@ -232,12 +245,20 @@ export default async function AthleteDetailPage({
           triage={triage}
           weekStart={weekStart}
           weekEnd={weekEnd}
-          weekLabel={weekLabel}
-          prevHref={prevHref}
-          nextHref={nextHref}
+          weekNav={weekNav}
         />
       ) : null}
-      {tab === "takip" ? <TakipTab athleteId={athleteId} triage={triage} /> : null}
+      {tab === "takip" ? (
+        <TakipTab
+          athleteId={athleteId}
+          triage={triage}
+          weekStartD={weekStartD}
+          weekStart={weekStart}
+          weekEnd={weekEnd}
+          weekNav={weekNav}
+          profileGoal={details?.goal ?? null}
+        />
+      ) : null}
       {tab === "fizik" ? <FizikTab athleteId={athleteId} /> : null}
     </div>
   );
@@ -377,17 +398,13 @@ async function AntrenmanTab({
   triage,
   weekStart,
   weekEnd,
-  weekLabel,
-  prevHref,
-  nextHref,
+  weekNav,
 }: {
   athleteId: string;
   triage: TriageResult | null;
   weekStart: string;
   weekEnd: string;
-  weekLabel: string;
-  prevHref: string;
-  nextHref: string;
+  weekNav: WeekNav;
 }) {
   const supabase = await createSupabaseServerClient();
   const [progress, weekly, { data: sessionsData }] = await Promise.all([
@@ -410,13 +427,9 @@ async function AntrenmanTab({
 
       <TrainingProgressView report={progress.report} />
 
-      <CoachWeeklyReportView
-        report={weekly.report}
-        plateaus={weekly.plateaus}
-        weekLabel={weekLabel}
-        prevHref={prevHref}
-        nextHref={nextHref}
-      />
+      <WeekSwitcher {...weekNav} />
+
+      <CoachWeeklyReportView report={weekly.report} plateaus={weekly.plateaus} />
 
       {/* Raw set logs stay one click away — the digested reports above are the
           default reading surface for the coach. */}
@@ -468,17 +481,13 @@ async function BeslenmeTab({
   triage,
   weekStart,
   weekEnd,
-  weekLabel,
-  prevHref,
-  nextHref,
+  weekNav,
 }: {
   athleteId: string;
   triage: TriageResult | null;
   weekStart: string;
   weekEnd: string;
-  weekLabel: string;
-  prevHref: string;
-  nextHref: string;
+  weekNav: WeekNav;
 }) {
   const supabase = await createSupabaseServerClient();
   const [nutritionWeekly, { data: protocolData }, { data: athleteAssignmentData }] =
@@ -504,12 +513,9 @@ async function BeslenmeTab({
     <div className="space-y-6">
       <TabAlerts triage={triage} athleteId={athleteId} tab="beslenme" />
 
-      <NutritionWeeklyReportView
-        report={nutritionWeekly}
-        weekLabel={weekLabel}
-        prevHref={prevHref}
-        nextHref={nextHref}
-      />
+      <WeekSwitcher {...weekNav} />
+
+      <NutritionWeeklyReportView report={nutritionWeekly} />
 
       <section className="space-y-3">
         <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
@@ -584,130 +590,77 @@ async function BeslenmeTab({
 /*  Takip                                                                     */
 /* -------------------------------------------------------------------------- */
 
+/** Days of history before the shown week feeding each metric's baseline —
+ * mirrors the athlete tracker page so both colour identically. */
+const BASELINE_WINDOW_DAYS = 28;
+
 async function TakipTab({
   athleteId,
   triage,
+  weekStartD,
+  weekStart,
+  weekEnd,
+  weekNav,
+  profileGoal,
 }: {
   athleteId: string;
   triage: TriageResult | null;
+  weekStartD: Date;
+  weekStart: string;
+  weekEnd: string;
+  weekNav: WeekNav;
+  profileGoal: "muscle_gain" | "strength" | "fat_loss" | "maintenance" | null;
 }) {
   const supabase = await createSupabaseServerClient();
-  const [{ data: metricsData }, { data: cardioData }] = await Promise.all([
-    supabase
-      .from("daily_metrics")
-      .select("*")
-      .eq("athlete_id", athleteId)
-      .order("metric_date", { ascending: false })
-      .limit(10),
-    supabase
-      .from("cardio_sessions")
-      .select("*")
-      .eq("athlete_id", athleteId)
-      .order("session_date", { ascending: false })
-      .order("created_at", { ascending: false })
-      .limit(8),
-  ]);
-  const metrics = (metricsData ?? []) as DailyMetric[];
+  const baselineStart = format(subDays(weekStartD, BASELINE_WINDOW_DAYS), "yyyy-MM-dd");
+
+  const [{ data: metricsData }, { data: settings }, { data: cardioData }] =
+    await Promise.all([
+      supabase
+        .from("daily_metrics")
+        .select("*")
+        .eq("athlete_id", athleteId)
+        .gte("metric_date", baselineStart)
+        .lte("metric_date", weekEnd),
+      supabase
+        .from("tracker_settings")
+        .select("enabled, goals")
+        .eq("athlete_id", athleteId)
+        .maybeSingle(),
+      supabase
+        .from("cardio_sessions")
+        .select("*")
+        .eq("athlete_id", athleteId)
+        .gte("session_date", weekStart)
+        .lte("session_date", weekEnd)
+        .order("session_date", { ascending: false })
+        .order("created_at", { ascending: false }),
+    ]);
+  const rows = (metricsData ?? []) as DailyMetric[];
   const cardio = (cardioData ?? []) as CardioSession[];
 
   return (
     <div className="space-y-6">
       <TabAlerts triage={triage} athleteId={athleteId} tab="takip" />
 
-      {metrics.length === 0 ? (
+      <WeekSwitcher {...weekNav} />
+
+      {rows.length === 0 ? (
         <EmptyState
           icon={Activity}
           title="Henüz takip girişi yok"
           description="Bu sporcu günlük takip (check-in) girmemiş."
         />
       ) : (
-        <section className="space-y-3">
-          <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-            <Activity className="size-4" /> Günlük takip
-          </h2>
-          <div className="overflow-x-auto rounded-xl border border-border">
-            <table className="w-full min-w-[30rem] text-sm">
-              <thead>
-                <tr className="border-b border-border text-[10px] uppercase tracking-wider text-muted-foreground">
-                  <th className="px-3 py-2 text-left font-medium">Tarih</th>
-                  <th className="px-2 py-2 text-center font-medium">Kilo</th>
-                  <th className="px-2 py-2 text-center font-medium">Uyku</th>
-                  <th className="px-2 py-2 text-center font-medium">RHR</th>
-                  <th className="px-2 py-2 text-center font-medium">Enerji</th>
-                  <th className="px-2 py-2 text-center font-medium">Uyum</th>
-                  <th className="px-2 py-2 text-center font-medium">Sindirim</th>
-                  <th className="px-2 py-2 text-center font-medium">Adım</th>
-                </tr>
-              </thead>
-              <tbody className="font-mono tabular-nums">
-                {metrics.map((m) => (
-                  <tr key={m.id} className="border-b border-border/60 last:border-0">
-                    <td className="px-3 py-2 text-left font-sans text-muted-foreground">
-                      {formatDate(m.metric_date, "d MMM")}
-                    </td>
-                    <td className="px-2 py-2 text-center">{formatNumber(m.weight)}</td>
-                    <td className="px-2 py-2 text-center">{formatNumber(m.sleep_hours)}</td>
-                    <td className="px-2 py-2 text-center">{m.resting_hr ?? "—"}</td>
-                    <td className="px-2 py-2 text-center">{m.energy ?? "—"}</td>
-                    <td className="px-2 py-2 text-center">{m.adherence ?? "—"}</td>
-                    <td className="px-2 py-2 text-center">{m.digestion ?? "—"}</td>
-                    <td className="px-2 py-2 text-center">
-                      {m.steps?.toLocaleString("tr-TR") ?? "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
+        <CoachTrackerWeek
+          weekStart={weekStartD}
+          rows={rows}
+          settingsEnabled={settings?.enabled}
+          settingsGoals={settings?.goals}
+          profileGoal={profileGoal}
+          cardio={cardio}
+        />
       )}
-
-      {cardio.length > 0 ? (
-        <section className="space-y-3">
-          <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-            <HeartPulse className="size-4" /> Kardiyo
-          </h2>
-          <div className="overflow-x-auto rounded-xl border border-border">
-            <table className="w-full min-w-[26rem] text-sm">
-              <thead>
-                <tr className="border-b border-border text-[10px] uppercase tracking-wider text-muted-foreground">
-                  <th className="px-3 py-2 text-left font-medium">Tarih</th>
-                  <th className="px-2 py-2 text-left font-medium">Aktivite</th>
-                  <th className="px-2 py-2 text-center font-medium">Süre</th>
-                  <th className="px-2 py-2 text-center font-medium">Mesafe</th>
-                  <th className="px-2 py-2 text-center font-medium">Kalori</th>
-                </tr>
-              </thead>
-              <tbody className="font-mono tabular-nums">
-                {cardio.map((c) => (
-                  <tr key={c.id} className="border-b border-border/60 last:border-0">
-                    <td className="px-3 py-2 text-left font-sans text-muted-foreground">
-                      {formatDate(c.session_date, "d MMM")}
-                    </td>
-                    <td className="px-2 py-2 text-left font-sans">
-                      {CARDIO_LABEL_TR[c.activity]}
-                      {c.note ? (
-                        <span className="ml-1.5 text-xs text-muted-foreground">
-                          — {c.note}
-                        </span>
-                      ) : null}
-                    </td>
-                    <td className="px-2 py-2 text-center">
-                      {formatDuration(c.duration_min)}
-                    </td>
-                    <td className="px-2 py-2 text-center">
-                      {c.distance_km != null
-                        ? `${formatNumber(c.distance_km)} km`
-                        : "—"}
-                    </td>
-                    <td className="px-2 py-2 text-center">{c.calories ?? "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      ) : null}
     </div>
   );
 }

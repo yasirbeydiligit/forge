@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 
 import { formatRest } from "@/lib/format";
 import type { CoachWeeklyReport } from "@/lib/reports/coach-weekly";
@@ -11,46 +10,20 @@ type Plateaus = Record<string, { stalled: boolean; sessions: number }>;
  * Coach weekly muscle-based report. Per muscle: which exercises trained it, the
  * order performed, set count, median rest, and RIR. A gentle "dikkat" note marks
  * an exercise that has not progressed in recent sessions. Volume is set count.
+ * Week navigation lives in the page-level WeekSwitcher.
  */
 export function CoachWeeklyReportView({
   report,
   plateaus,
-  weekLabel,
-  prevHref,
-  nextHref,
 }: {
   report: CoachWeeklyReport;
   plateaus: Plateaus;
-  weekLabel: string;
-  prevHref: string;
-  nextHref: string;
 }) {
   return (
     <section className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-          Haftalık kas raporu
-        </h2>
-        <div className="flex items-center gap-2">
-          <Link
-            href={prevHref}
-            aria-label="Önceki hafta"
-            className="flex size-7 items-center justify-center rounded-md border border-border text-muted-foreground hover:text-foreground"
-          >
-            <ChevronLeft className="size-4" />
-          </Link>
-          <span className="min-w-[8.5rem] text-center font-mono text-xs tabular-nums text-foreground">
-            {weekLabel}
-          </span>
-          <Link
-            href={nextHref}
-            aria-label="Sonraki hafta"
-            className="flex size-7 items-center justify-center rounded-md border border-border text-muted-foreground hover:text-foreground"
-          >
-            <ChevronRight className="size-4" />
-          </Link>
-        </div>
-      </div>
+      <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+        Haftalık kas raporu
+      </h2>
 
       {report.totalSets === 0 ? (
         <p className="rounded-xl border border-border bg-card px-4 py-6 text-center text-sm text-muted-foreground">
