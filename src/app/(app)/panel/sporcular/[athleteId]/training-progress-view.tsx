@@ -86,20 +86,70 @@ function ExerciseRow({ ex }: { ex: ExerciseProgress }) {
   );
 }
 
+export type WindowOption = { weeks: number; href: string; active: boolean };
+
 export function TrainingProgressView({
   report,
+  windowWeeks,
+  windowOptions,
+  formAction,
+  formHidden,
 }: {
   report: TrainingProgressReport;
+  windowWeeks: number;
+  /** Preset week-window links (1/4/8/12). */
+  windowOptions: WindowOption[];
+  /** GET form target + hidden fields for a free-typed week count. */
+  formAction: string;
+  formHidden: Record<string, string>;
 }) {
   return (
     <section className="space-y-3">
-      <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-        İlerleme raporu · son 12 hafta
-      </h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          İlerleme raporu · son {windowWeeks} hafta
+        </h2>
+        <div className="flex items-center gap-1.5">
+          {windowOptions.map((o) => (
+            <a
+              key={o.weeks}
+              href={o.href}
+              className={cn(
+                "rounded-full border px-2.5 py-1 font-mono text-xs tabular-nums transition-colors",
+                o.active
+                  ? "border-primary bg-primary/10 font-semibold text-primary"
+                  : "border-border text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {o.weeks}H
+            </a>
+          ))}
+          <form method="get" action={formAction} className="flex items-center gap-1">
+            {Object.entries(formHidden).map(([name, value]) => (
+              <input key={name} type="hidden" name={name} value={value} />
+            ))}
+            <input
+              type="number"
+              name="win"
+              min={1}
+              max={52}
+              defaultValue={windowWeeks}
+              aria-label="Hafta sayısı"
+              className="h-7 w-14 rounded-full border border-border bg-transparent px-2 text-center font-mono text-xs tabular-nums outline-none focus:border-primary"
+            />
+            <button
+              type="submit"
+              className="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Uygula
+            </button>
+          </form>
+        </div>
+      </div>
 
       {report.exercisesTotal === 0 ? (
         <p className="rounded-xl border border-border bg-card px-4 py-6 text-center text-sm text-muted-foreground">
-          Son 12 haftada kayıtlı antrenman yok.
+          Son {windowWeeks} haftada kayıtlı antrenman yok.
         </p>
       ) : (
         <>

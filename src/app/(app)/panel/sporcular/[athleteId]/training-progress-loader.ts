@@ -15,8 +15,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 type Client = SupabaseClient<Database>;
 
-/** Report window (coach reads "son 12 hafta"). */
-export const PROGRESS_WINDOW_DAYS = 84;
+/** Default report window in weeks (coach can pick 1/4/8/12 or any value). */
+export const DEFAULT_PROGRESS_WEEKS = 12;
+export const MAX_PROGRESS_WEEKS = 52;
 /** Extra trailing history feeding PR evaluation only. */
 const HISTORY_DAYS = 365;
 
@@ -46,10 +47,14 @@ export type TrainingProgressResult = {
 export async function loadTrainingProgress(
   supabase: Client,
   athleteId: string,
+  windowWeeks: number = DEFAULT_PROGRESS_WEEKS,
 ): Promise<TrainingProgressResult> {
   const now = new Date();
-  const windowStart = format(subDays(now, PROGRESS_WINDOW_DAYS), "yyyy-MM-dd");
-  const historyStart = format(subDays(now, HISTORY_DAYS), "yyyy-MM-dd");
+  const windowStart = format(subDays(now, windowWeeks * 7), "yyyy-MM-dd");
+  const historyStart = format(
+    subDays(now, Math.max(HISTORY_DAYS, windowWeeks * 7)),
+    "yyyy-MM-dd",
+  );
 
   const { data } = await supabase
     .from("log_sets")

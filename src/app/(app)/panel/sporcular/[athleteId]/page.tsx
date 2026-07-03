@@ -47,10 +47,19 @@ import { loadCoachWeekly } from "./coach-weekly-loader";
 import { CoachWeeklyReportView } from "./coach-weekly-report";
 import { loadNutritionWeekly } from "./nutrition-weekly-loader";
 import { NutritionWeeklyReportView } from "./nutrition-weekly-report";
+import {
+  ExerciseHistoryView,
+  type ExerciseOption,
+  type HistorySet,
+} from "./exercise-history-view";
 import { QuickMessage, type QuickMessagePost } from "./quick-message";
 import { CoachTrackerWeek } from "./tracker-week-view";
-import { loadTrainingProgress } from "./training-progress-loader";
-import { TrainingProgressView } from "./training-progress-view";
+import {
+  DEFAULT_PROGRESS_WEEKS,
+  MAX_PROGRESS_WEEKS,
+  loadTrainingProgress,
+} from "./training-progress-loader";
+import { TrainingProgressView, type WindowOption } from "./training-progress-view";
 
 export const metadata: Metadata = { title: "Sporcu" };
 
@@ -80,14 +89,18 @@ export default async function AthleteDetailPage({
   searchParams,
 }: {
   params: Promise<{ athleteId: string }>;
-  searchParams: Promise<{ week?: string; tab?: string }>;
+  searchParams: Promise<{ week?: string; tab?: string; win?: string; ex?: string }>;
 }) {
   await requireCoach();
   const { athleteId } = await params;
-  const { week, tab: tabParam } = await searchParams;
+  const { week, tab: tabParam, win: winParam, ex } = await searchParams;
   const tab: Tab = (TABS as readonly string[]).includes(tabParam ?? "")
     ? (tabParam as Tab)
     : "genel";
+  const winParsed = Number.parseInt(winParam ?? "", 10);
+  const winWeeks = Number.isFinite(winParsed)
+    ? Math.min(Math.max(winParsed, 1), MAX_PROGRESS_WEEKS)
+    : DEFAULT_PROGRESS_WEEKS;
   const supabase = await createSupabaseServerClient();
 
   // Week selection (Mon–Sun) from ?week=YYYY-MM-DD; defaults to the current week.
@@ -237,6 +250,9 @@ export default async function AthleteDetailPage({
           weekStart={weekStart}
           weekEnd={weekEnd}
           weekNav={weekNav}
+          week={week}
+          winWeeks={winWeeks}
+          selectedExercise={ex}
         />
       ) : null}
       {tab === "beslenme" ? (
@@ -399,33 +415,114 @@ async function AntrenmanTab({
   weekStart,
   weekEnd,
   weekNav,
+  week,
+  winWeeks,
+  selectedExercise,
 }: {
   athleteId: string;
   triage: TriageResult | null;
   weekStart: string;
   weekEnd: string;
   weekNav: WeekNav;
+  week?: string;
+  winWeeks: number;
+  selectedExercise?: string;
 }) {
   const supabase = await createSupabaseServerClient();
-  const [progress, weekly, { data: sessionsData }] = await Promise.all([
-    loadTrainingProgress(supabase, athleteId),
-    loadCoachWeekly(supabase, athleteId, weekStart, weekEnd),
-    supabase
-      .from("log_sessions")
-      .select(
-        "id, session_date, completed, notes, workout:workouts(name), log_sets(id, set_number, weight, reps, rir, notes, exercise_id, exercise:exercises(name))",
-      )
-      .eq("athlete_id", athleteId)
-      .order("session_date", { ascending: false })
-      .limit(25),
-  ]);
+  const [progress, weekly, { data: sessionsData }, { data: allSetsData }] =
+    await Promise.all([
+      loadTrainingProgress(supabase, athleteId, winWeeks),
+      loadCoachWeekly(supabase, athleteId, weekStart, weekEnd),
+      supabase
+        .from("log_sessions")
+        .select(
+          "id, session_date, completed, notes, workout:workouts(name), log_sets(id, set_number, weight, reps, rir, notes, exercise_id, exercise:exercises(name))",
+        )
+        .eq("athlete_id", athleteId)
+        .order("session_date", { ascending: false })
+        .limit(25),
+      // Every exercise the athlete ever logged (for the history picker).
+      supabase
+        .from("log_sets")
+        .select("exercise_id, exercise:exercises(name), session:log_sessions!inner(athlete_id)")
+        .eq("log_sessions.athlete_id", athleteId),
+    ]);
   const sessions = (sessionsData ?? []) as unknown as SessionRow[];
+
+  // Aggregate the all-time exercise list, most-trained first.
+  const optionMap = new Map<string, ExerciseOption>();
+  for (const row of (allSetsData ?? []) as unknown as {
+    exercise_id: string;
+    exercise: { name: string } | null;
+  }[]) {
+    const entry = optionMap.get(row.exercise_id) ?? {
+      exerciseId: row.exercise_id,
+      name: row.exercise?.name ?? "Egzersiz",
+      totalSets: 0,
+    };
+    entry.totalSets += 1;
+    optionMap.set(row.exercise_id, entry);
+  }
+  const options = [...optionMap.values()].sort((a, b) => b.totalSets - a.totalSets);
+  const selectedId =
+    options.find((o) => o.exerciseId === selectedExercise)?.exerciseId ??
+    options[0]?.exerciseId ??
+    null;
+
+  // Full set history of the selected exercise.
+  let historySets: HistorySet[] = [];
+  if (selectedId) {
+    const { data: exSets } = await supabase
+      .from("log_sets")
+      .select("set_number, weight, reps, rir, session:log_sessions!inner(athlete_id, session_date)")
+      .eq("log_sessions.athlete_id", athleteId)
+      .eq("exercise_id", selectedId);
+    historySets = ((exSets ?? []) as unknown as {
+      set_number: number;
+      weight: number | null;
+      reps: number | null;
+      rir: number | null;
+      session: { session_date: string } | null;
+    }[]).map((r) => ({
+      date: r.session?.session_date ?? "",
+      setNumber: r.set_number,
+      weight: r.weight != null ? Number(r.weight) : null,
+      reps: r.reps,
+      rir: r.rir != null ? Number(r.rir) : null,
+    }));
+  }
+
+  // Tab-preserving query strings for the window pills + exercise chips.
+  const base = `/panel/sporcular/${athleteId}`;
+  const qs = (over: { win?: number; ex?: string }) => {
+    const params = new URLSearchParams({ tab: "antrenman" });
+    if (week) params.set("week", week);
+    const winValue = over.win ?? winWeeks;
+    if (winValue !== DEFAULT_PROGRESS_WEEKS) params.set("win", String(winValue));
+    const exValue = over.ex ?? selectedExercise;
+    if (exValue) params.set("ex", exValue);
+    return `${base}?${params.toString()}`;
+  };
+  const windowOptions: WindowOption[] = [1, 4, 8, 12].map((weeks) => ({
+    weeks,
+    href: qs({ win: weeks }),
+    active: weeks === winWeeks,
+  }));
+  const formHidden: Record<string, string> = { tab: "antrenman" };
+  if (week) formHidden.week = week;
+  if (selectedExercise) formHidden.ex = selectedExercise;
 
   return (
     <div className="space-y-6">
       <TabAlerts triage={triage} athleteId={athleteId} tab="antrenman" />
 
-      <TrainingProgressView report={progress.report} />
+      <TrainingProgressView
+        report={progress.report}
+        windowWeeks={winWeeks}
+        windowOptions={windowOptions}
+        formAction={base}
+        formHidden={formHidden}
+      />
 
       <WeekSwitcher {...weekNav} />
 
@@ -433,6 +530,13 @@ async function AntrenmanTab({
         report={weekly.report}
         plateaus={weekly.plateaus}
         prs={weekly.prs}
+      />
+
+      <ExerciseHistoryView
+        options={options}
+        selectedId={selectedId}
+        sets={historySets}
+        hrefFor={(exerciseId) => qs({ ex: exerciseId })}
       />
 
       {/* Raw set logs stay one click away — the digested reports above are the
