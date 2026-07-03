@@ -116,3 +116,23 @@ doğrulandı:
    switcher kullanıyor, `?week=` sekmeyi koruyor.
 
 Final kapılar yeniden: 328 test ✓ · typecheck ✓ · lint ✓ · build ✓.
+
+## 8. Geri bildirim turu 2 (2026-07-03, gece)
+
+1. **Ayarlanabilir ilerleme penceresi.** `?win=` (hafta, 1–52 clamp,
+   varsayılan 12): başlıkta 1H/4H/8H/12H pill linkleri + serbest sayı girişli
+   GET formu ("Uygula"). `loadTrainingProgress(supabase, athleteId,
+   windowWeeks)` parametreli; PR tarihçesi her durumda ≥365 gün beslenir.
+2. **Hareket geçmişi.** Antrenman sekmesine "Hareket geçmişi" bölümü:
+   sporcunun tüm zamanlardaki hareketleri set sayısıyla çip olarak (`?ex=`),
+   seçilende en-iyi-set grafiği (İlerleme sayfasının `ProgressChartLazy`'si)
+   + tarih-gruplu TÜM setler tablosu (set no · kg · tekrar · RIR, en yeni
+   seans üstte, kaydırılabilir).
+3. **Haftalık kas raporuna PR kolonu.** Sıra/Set/Dinlenme/RIR yanına PR:
+   hafta içi güç PR olayları (🏆 n, yoksa —). Saf `countPrEvents`
+   (`src/lib/pr/count-events.ts`, 4 vitest; RIR-only hariç, pencere-öncesi
+   tarihçe referans) hem burada hem ilerleme motorunda tek kaynak.
+
+Görsel doğrulama: masaüstü 1440 + mobil 500 ekran görüntüleri (pill seçici,
+PR kolonu, çip+grafik+tüm-setler tablosu). Final: 332 test ✓ · typecheck ✓ ·
+lint ✓ · build ✓. Dal main'e merge edilip push'landı.
