@@ -15,9 +15,8 @@ import { PaperCard } from "@/components/lab/lab";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatRelative, getInitials } from "@/lib/format";
 import type { TriageBand, TriageResult } from "@/lib/triage/types";
+import { ScoreRing } from "@/components/triage/score-ring";
 import { cn } from "@/lib/utils";
-
-import { ScoreRing } from "./score-ring";
 
 const STRIP: Record<TriageBand, string> = {
   green: "bg-lab-green",

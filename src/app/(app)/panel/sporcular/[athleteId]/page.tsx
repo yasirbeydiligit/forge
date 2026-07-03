@@ -15,12 +15,15 @@ import {
 
 import { toggleAssignment } from "../../protokoller/actions";
 import { EmptyState } from "@/components/empty-state";
+import { SectionLabel } from "@/components/lab/lab";
 import { SessionView, type SessionRow } from "@/components/logbook/session-view";
+import { AlertGroups } from "@/components/triage/alert-item";
+import { ScoreRing } from "@/components/triage/score-ring";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { requireCoach } from "@/lib/auth";
 import { CARDIO_LABEL_TR, formatDuration } from "@/lib/cardio";
-import { formatDate, formatNumber, getInitials } from "@/lib/format";
+import { formatDate, formatNumber, formatRelative, getInitials } from "@/lib/format";
 import {
   PROTOCOL_TIMING_LABEL_TR,
   sortByTiming,
@@ -29,6 +32,8 @@ import {
 import { signPhysiquePaths } from "@/lib/physique";
 import { GOAL_LABEL_TR, ageFrom } from "@/lib/profile";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { loadTriageForAthlete } from "@/lib/triage/load-triage";
+import type { AlertTab, TriageResult } from "@/lib/triage/types";
 import type {
   CardioSession,
   DailyMetric,
@@ -36,26 +41,42 @@ import type {
   ProfileDetails,
   ProtocolTemplate,
 } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 import { loadCoachWeekly } from "./coach-weekly-loader";
 import { CoachWeeklyReportView } from "./coach-weekly-report";
 import { loadNutritionWeekly } from "./nutrition-weekly-loader";
 import { NutritionWeeklyReportView } from "./nutrition-weekly-report";
+import { QuickMessage, type QuickMessagePost } from "./quick-message";
 
 export const metadata: Metadata = { title: "Sporcu" };
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+const TABS = ["genel", "antrenman", "beslenme", "takip", "fizik"] as const;
+type Tab = (typeof TABS)[number];
+
+const TAB_LABEL: Record<Tab, string> = {
+  genel: "Genel",
+  antrenman: "Antrenman",
+  beslenme: "Beslenme",
+  takip: "Takip",
+  fizik: "Fizik",
+};
 
 export default async function AthleteDetailPage({
   params,
   searchParams,
 }: {
   params: Promise<{ athleteId: string }>;
-  searchParams: Promise<{ week?: string }>;
+  searchParams: Promise<{ week?: string; tab?: string }>;
 }) {
   await requireCoach();
   const { athleteId } = await params;
-  const { week } = await searchParams;
+  const { week, tab: tabParam } = await searchParams;
+  const tab: Tab = (TABS as readonly string[]).includes(tabParam ?? "")
+    ? (tabParam as Tab)
+    : "genel";
   const supabase = await createSupabaseServerClient();
 
   // Week selection (Mon–Sun) from ?week=YYYY-MM-DD; defaults to the current week.
@@ -65,114 +86,26 @@ export default async function AthleteDetailPage({
   const weekStart = format(weekStartD, "yyyy-MM-dd");
   const weekEnd = format(weekEndD, "yyyy-MM-dd");
 
-  const { data: athlete } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", athleteId)
-    .maybeSingle();
-  if (!athlete) notFound();
-
-  const [
-    { data: enrollmentsData },
-    { data: ownProgramsData },
-    { data: sessionsData },
-    { data: metricsData },
-    { data: protocolData },
-    { data: athleteAssignmentData },
-    { data: detailsData },
-    { data: physiqueData },
-    { data: cardioData },
-    weekly,
-    nutritionWeekly,
-  ] = await Promise.all([
-      supabase
-        .from("enrollments")
-        .select("id, status, program:programs(name)")
-        .eq("athlete_id", athleteId),
-      // The athlete's own personal programs — coach read-only (RLS), for tracking.
-      supabase
-        .from("programs")
-        .select("id, name, description, workouts(count)")
-        .eq("created_by", athleteId)
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("log_sessions")
-        .select(
-          "id, session_date, completed, notes, workout:workouts(name), log_sets(id, set_number, weight, reps, rir, notes, exercise_id, exercise:exercises(name))",
-        )
-        .eq("athlete_id", athleteId)
-        .order("session_date", { ascending: false })
-        .limit(25),
-      supabase
-        .from("daily_metrics")
-        .select("*")
-        .eq("athlete_id", athleteId)
-        .order("metric_date", { ascending: false })
-        .limit(10),
-      supabase
-        .from("protocol_templates")
-        .select("*")
-        .eq("is_active", true)
-        .order("order_index", { ascending: true }),
-      supabase
-        .from("protocol_assignments")
-        .select("protocol_id")
-        .eq("athlete_id", athleteId),
+  // Always needed: identity, profile meta, triage, recent feed posts (quick touch).
+  const [{ data: athlete }, { data: detailsData }, triage, { data: postsData }] =
+    await Promise.all([
+      supabase.from("profiles").select("*").eq("id", athleteId).maybeSingle(),
       supabase
         .from("profile_details")
         .select("*")
         .eq("user_id", athleteId)
         .maybeSingle(),
+      loadTriageForAthlete(athleteId),
       supabase
-        .from("physique_photos")
-        .select("*")
-        .eq("athlete_id", athleteId)
-        .order("photo_date", { ascending: false })
+        .from("feed_posts")
+        .select("id, body, is_question, answered, created_at")
+        .eq("author_id", athleteId)
         .order("created_at", { ascending: false })
-        .limit(4),
-      supabase
-        .from("cardio_sessions")
-        .select("*")
-        .eq("athlete_id", athleteId)
-        .order("session_date", { ascending: false })
-        .order("created_at", { ascending: false })
-        .limit(8),
-      loadCoachWeekly(supabase, athleteId, weekStart, weekEnd),
-      loadNutritionWeekly(supabase, athleteId, weekStart, weekEnd),
+        .limit(5),
     ]);
-
-  const base = `/panel/sporcular/${athleteId}`;
-  const prevHref = `${base}?week=${format(addWeeks(weekStartD, -1), "yyyy-MM-dd")}`;
-  const nextHref = `${base}?week=${format(addWeeks(weekStartD, 1), "yyyy-MM-dd")}`;
-  const weekLabel = `${format(weekStartD, "d MMM")} – ${format(weekEndD, "d MMM")}`;
-
-  const enrollments = (enrollmentsData ?? []) as {
-    id: string;
-    status: string;
-    program: { name: string } | null;
-  }[];
-  const sessions = (sessionsData ?? []) as unknown as SessionRow[];
-  const metrics = (metricsData ?? []) as DailyMetric[];
-  const ownPrograms = (ownProgramsData ?? []) as {
-    id: string;
-    name: string;
-    description: string | null;
-    workouts: { count: number }[];
-  }[];
-
-  const protocols = sortByTiming((protocolData ?? []) as ProtocolTemplate[]);
-  const assignedIds = new Set(
-    (athleteAssignmentData ?? []).map((a) => a.protocol_id),
-  );
+  if (!athlete) notFound();
 
   const details = detailsData as ProfileDetails | null;
-  const cardio = (cardioData ?? []) as CardioSession[];
-  const physique = (physiqueData ?? []) as PhysiquePhoto[];
-  const physiqueUrls = await signPhysiquePaths(
-    supabase,
-    physique.map((p) => p.storage_path),
-  );
-
   const age = ageFrom(details?.birth_date);
   const profileMeta = [
     details?.goal ? GOAL_LABEL_TR[details.goal] : null,
@@ -183,6 +116,24 @@ export default async function AthleteDetailPage({
     details?.height_cm ? `${details.height_cm} cm` : null,
   ].filter(Boolean);
 
+  const posts: QuickMessagePost[] = (postsData ?? []).map((p) => ({
+    id: p.id,
+    body: p.body,
+    isQuestion: p.is_question,
+    answered: p.answered,
+    createdAt: p.created_at,
+  }));
+
+  const base = `/panel/sporcular/${athleteId}`;
+  const weekQS = week ? `&week=${week}` : "";
+  const tabHref = (t: Tab) => `${base}?tab=${t}${weekQS}`;
+  const prevHref = `${base}?tab=${tab}&week=${format(addWeeks(weekStartD, -1), "yyyy-MM-dd")}`;
+  const nextHref = `${base}?tab=${tab}&week=${format(addWeeks(weekStartD, 1), "yyyy-MM-dd")}`;
+  const weekLabel = `${format(weekStartD, "d MMM")} – ${format(weekEndD, "d MMM")}`;
+
+  const alertCountFor = (t: Tab) =>
+    triage?.alerts.filter((a) => a.tab === (t as AlertTab)).length ?? 0;
+
   return (
     <div className="space-y-6">
       <Link
@@ -192,7 +143,7 @@ export default async function AthleteDetailPage({
         <ArrowLeft className="size-4" /> Sporcular
       </Link>
 
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-4">
         <Avatar className="size-16 border border-border">
           {athlete.avatar_url ? (
             <AvatarImage src={athlete.avatar_url} alt={athlete.full_name} />
@@ -201,22 +152,170 @@ export default async function AthleteDetailPage({
             {getInitials(athlete.full_name)}
           </AvatarFallback>
         </Avatar>
-        <div>
+        <div className="min-w-0 flex-1">
           <h1 className="text-2xl font-bold tracking-tight">
             {athlete.full_name}
           </h1>
-          {athlete.bio ? (
-            <p className="text-sm text-muted-foreground">{athlete.bio}</p>
-          ) : (
-            <p className="text-sm text-muted-foreground">Sporcu</p>
-          )}
+          <p className="text-sm text-muted-foreground">
+            {athlete.bio ?? "Sporcu"}
+          </p>
           {profileMeta.length ? (
             <p className="mt-1 font-mono text-xs tabular-nums text-muted-foreground">
               {profileMeta.join(" · ")}
             </p>
           ) : null}
         </div>
+        <div className="flex items-center gap-3">
+          <QuickMessage
+            athleteId={athleteId}
+            athleteName={athlete.full_name}
+            posts={posts}
+          />
+          {triage ? <ScoreRing score={triage.score} band={triage.band} /> : null}
+        </div>
       </div>
+
+      {/* Tab bar — server-rendered links so the URL is shareable. */}
+      <nav className="-mx-1 flex gap-1 overflow-x-auto border-b border-border px-1">
+        {TABS.map((t) => {
+          const active = t === tab;
+          const count = t === "genel" ? (triage?.alerts.length ?? 0) : alertCountFor(t);
+          return (
+            <Link
+              key={t}
+              href={tabHref(t)}
+              aria-current={active ? "page" : undefined}
+              className={cn(
+                "relative flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors duration-[var(--dur-fast)] ease-soft",
+                active
+                  ? "text-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {TAB_LABEL[t]}
+              {count > 0 ? (
+                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-lab-rose/10 px-1 font-mono text-[10px] font-semibold text-lab-rose">
+                  {count}
+                </span>
+              ) : null}
+              {active ? (
+                <span
+                  aria-hidden
+                  className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-primary"
+                />
+              ) : null}
+            </Link>
+          );
+        })}
+      </nav>
+
+      {tab === "genel" ? (
+        <GenelTab supabase={supabase} athleteId={athleteId} triage={triage} />
+      ) : null}
+      {tab === "antrenman" ? (
+        <AntrenmanTab
+          athleteId={athleteId}
+          triage={triage}
+          weekStart={weekStart}
+          weekEnd={weekEnd}
+          weekLabel={weekLabel}
+          prevHref={prevHref}
+          nextHref={nextHref}
+        />
+      ) : null}
+      {tab === "beslenme" ? (
+        <BeslenmeTab
+          athleteId={athleteId}
+          triage={triage}
+          weekStart={weekStart}
+          weekEnd={weekEnd}
+          weekLabel={weekLabel}
+          prevHref={prevHref}
+          nextHref={nextHref}
+        />
+      ) : null}
+      {tab === "takip" ? <TakipTab athleteId={athleteId} triage={triage} /> : null}
+      {tab === "fizik" ? <FizikTab athleteId={athleteId} /> : null}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Shared bits                                                               */
+/* -------------------------------------------------------------------------- */
+
+function TabAlerts({
+  triage,
+  athleteId,
+  tab,
+}: {
+  triage: TriageResult | null;
+  athleteId: string;
+  tab?: AlertTab;
+}) {
+  const alerts = tab
+    ? (triage?.alerts.filter((a) => a.tab === tab) ?? [])
+    : (triage?.alerts ?? []);
+  if (alerts.length === 0) return null;
+  return (
+    <section className="space-y-3">
+      <SectionLabel>Açık uyarılar</SectionLabel>
+      <AlertGroups alerts={alerts} athleteId={athleteId} detail />
+    </section>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Genel                                                                     */
+/* -------------------------------------------------------------------------- */
+
+async function GenelTab({
+  supabase,
+  athleteId,
+  triage,
+}: {
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
+  athleteId: string;
+  triage: TriageResult | null;
+}) {
+  const [{ data: enrollmentsData }, { data: ownProgramsData }] =
+    await Promise.all([
+      supabase
+        .from("enrollments")
+        .select("id, status, program:programs(name)")
+        .eq("athlete_id", athleteId),
+      // The athlete's own personal programs — coach read-only (RLS), for tracking.
+      supabase
+        .from("programs")
+        .select("id, name, description, workouts(count)")
+        .eq("created_by", athleteId)
+        .order("created_at", { ascending: false }),
+    ]);
+
+  const enrollments = (enrollmentsData ?? []) as {
+    id: string;
+    status: string;
+    program: { name: string } | null;
+  }[];
+  const ownPrograms = (ownProgramsData ?? []) as {
+    id: string;
+    name: string;
+    description: string | null;
+    workouts: { count: number }[];
+  }[];
+
+  return (
+    <div className="space-y-6">
+      {triage && triage.alerts.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          Açık uyarı yok — her şey yolunda görünüyor.
+          {triage.lastActivity
+            ? ` Son aktivite ${formatRelative(triage.lastActivity)}.`
+            : ""}
+        </p>
+      ) : (
+        <TabAlerts triage={triage} athleteId={athleteId} />
+      )}
 
       <section className="space-y-3">
         <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
@@ -247,10 +346,7 @@ export default async function AthleteDetailPage({
           </h2>
           <div className="grid gap-3 sm:grid-cols-2">
             {ownPrograms.map((p) => (
-              <div
-                key={p.id}
-                className="rounded-xl border border-border p-4"
-              >
+              <div key={p.id} className="rounded-xl border border-border p-4">
                 <p className="font-medium">{p.name}</p>
                 {p.description ? (
                   <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">
@@ -265,6 +361,48 @@ export default async function AthleteDetailPage({
           </div>
         </section>
       ) : null}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Antrenman                                                                 */
+/* -------------------------------------------------------------------------- */
+
+async function AntrenmanTab({
+  athleteId,
+  triage,
+  weekStart,
+  weekEnd,
+  weekLabel,
+  prevHref,
+  nextHref,
+}: {
+  athleteId: string;
+  triage: TriageResult | null;
+  weekStart: string;
+  weekEnd: string;
+  weekLabel: string;
+  prevHref: string;
+  nextHref: string;
+}) {
+  const supabase = await createSupabaseServerClient();
+  const [weekly, { data: sessionsData }] = await Promise.all([
+    loadCoachWeekly(supabase, athleteId, weekStart, weekEnd),
+    supabase
+      .from("log_sessions")
+      .select(
+        "id, session_date, completed, notes, workout:workouts(name), log_sets(id, set_number, weight, reps, rir, notes, exercise_id, exercise:exercises(name))",
+      )
+      .eq("athlete_id", athleteId)
+      .order("session_date", { ascending: false })
+      .limit(25),
+  ]);
+  const sessions = (sessionsData ?? []) as unknown as SessionRow[];
+
+  return (
+    <div className="space-y-6">
+      <TabAlerts triage={triage} athleteId={athleteId} tab="antrenman" />
 
       <CoachWeeklyReportView
         report={weekly.report}
@@ -273,6 +411,82 @@ export default async function AthleteDetailPage({
         prevHref={prevHref}
         nextHref={nextHref}
       />
+
+      <section className="space-y-3">
+        <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          <NotebookPen className="size-4" /> Antrenman geçmişi
+        </h2>
+        {sessions.length === 0 ? (
+          <EmptyState
+            icon={NotebookPen}
+            title="Henüz kayıt yok"
+            description="Bu sporcu henüz logbook'una antrenman işlememiş."
+          />
+        ) : (
+          <div className="space-y-4">
+            {sessions.map((s) => (
+              <div key={s.id} className="space-y-1.5">
+                <SessionView session={s} />
+                <Link
+                  href={`/panel/sporcular/${athleteId}/seans/${s.id}`}
+                  className="inline-flex items-center gap-1 px-1 text-xs font-medium text-lab-green hover:underline"
+                >
+                  Kas raporunu gör
+                  <ChevronRight className="size-3.5" />
+                </Link>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Beslenme                                                                  */
+/* -------------------------------------------------------------------------- */
+
+async function BeslenmeTab({
+  athleteId,
+  triage,
+  weekStart,
+  weekEnd,
+  weekLabel,
+  prevHref,
+  nextHref,
+}: {
+  athleteId: string;
+  triage: TriageResult | null;
+  weekStart: string;
+  weekEnd: string;
+  weekLabel: string;
+  prevHref: string;
+  nextHref: string;
+}) {
+  const supabase = await createSupabaseServerClient();
+  const [nutritionWeekly, { data: protocolData }, { data: athleteAssignmentData }] =
+    await Promise.all([
+      loadNutritionWeekly(supabase, athleteId, weekStart, weekEnd),
+      supabase
+        .from("protocol_templates")
+        .select("*")
+        .eq("is_active", true)
+        .order("order_index", { ascending: true }),
+      supabase
+        .from("protocol_assignments")
+        .select("protocol_id")
+        .eq("athlete_id", athleteId),
+    ]);
+
+  const protocols = sortByTiming((protocolData ?? []) as ProtocolTemplate[]);
+  const assignedIds = new Set(
+    (athleteAssignmentData ?? []).map((a) => a.protocol_id),
+  );
+
+  return (
+    <div className="space-y-6">
+      <TabAlerts triage={triage} athleteId={athleteId} tab="beslenme" />
 
       <NutritionWeeklyReportView
         report={nutritionWeekly}
@@ -346,8 +560,51 @@ export default async function AthleteDetailPage({
           </div>
         )}
       </section>
+    </div>
+  );
+}
 
-      {metrics.length > 0 ? (
+/* -------------------------------------------------------------------------- */
+/*  Takip                                                                     */
+/* -------------------------------------------------------------------------- */
+
+async function TakipTab({
+  athleteId,
+  triage,
+}: {
+  athleteId: string;
+  triage: TriageResult | null;
+}) {
+  const supabase = await createSupabaseServerClient();
+  const [{ data: metricsData }, { data: cardioData }] = await Promise.all([
+    supabase
+      .from("daily_metrics")
+      .select("*")
+      .eq("athlete_id", athleteId)
+      .order("metric_date", { ascending: false })
+      .limit(10),
+    supabase
+      .from("cardio_sessions")
+      .select("*")
+      .eq("athlete_id", athleteId)
+      .order("session_date", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(8),
+  ]);
+  const metrics = (metricsData ?? []) as DailyMetric[];
+  const cardio = (cardioData ?? []) as CardioSession[];
+
+  return (
+    <div className="space-y-6">
+      <TabAlerts triage={triage} athleteId={athleteId} tab="takip" />
+
+      {metrics.length === 0 ? (
+        <EmptyState
+          icon={Activity}
+          title="Henüz takip girişi yok"
+          description="Bu sporcu günlük takip (check-in) girmemiş."
+        />
+      ) : (
         <section className="space-y-3">
           <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             <Activity className="size-4" /> Günlük takip
@@ -387,50 +644,7 @@ export default async function AthleteDetailPage({
             </table>
           </div>
         </section>
-      ) : null}
-
-      {physique.length > 0 ? (
-        <section className="space-y-3">
-          <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-            <Camera className="size-4" /> Fizik takip
-          </h2>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {physique.map((p) => {
-              const url = physiqueUrls.get(p.storage_path);
-              if (!url) return null;
-              return (
-                <figure
-                  key={p.id}
-                  className="overflow-hidden rounded-xl border border-border"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={url}
-                    alt={`Fizik — ${formatDate(p.photo_date)}`}
-                    loading="lazy"
-                    className="aspect-[3/4] w-full object-cover"
-                  />
-                  <figcaption className="flex items-baseline justify-between gap-2 p-2 font-mono text-xs tabular-nums">
-                    <span>{formatDate(p.photo_date, "d MMM")}</span>
-                    {p.weight_kg != null ? (
-                      <span className="text-muted-foreground">
-                        {formatNumber(p.weight_kg)} kg
-                      </span>
-                    ) : null}
-                  </figcaption>
-                </figure>
-              );
-            })}
-          </div>
-          <Link
-            href={`/panel/sporcular/${athleteId}/fizik`}
-            className="inline-flex items-center gap-1 text-xs font-medium text-lab-green hover:underline"
-          >
-            Tüm fotoğraflar + karşılaştırma
-            <ChevronRight className="size-3.5" />
-          </Link>
-        </section>
-      ) : null}
+      )}
 
       {cardio.length > 0 ? (
         <section className="space-y-3">
@@ -478,34 +692,80 @@ export default async function AthleteDetailPage({
           </div>
         </section>
       ) : null}
-
-      <section className="space-y-3">
-        <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-          <NotebookPen className="size-4" /> Antrenman geçmişi
-        </h2>
-        {sessions.length === 0 ? (
-          <EmptyState
-            icon={NotebookPen}
-            title="Henüz kayıt yok"
-            description="Bu sporcu henüz logbook'una antrenman işlememiş."
-          />
-        ) : (
-          <div className="space-y-4">
-            {sessions.map((s) => (
-              <div key={s.id} className="space-y-1.5">
-                <SessionView session={s} />
-                <Link
-                  href={`/panel/sporcular/${athleteId}/seans/${s.id}`}
-                  className="inline-flex items-center gap-1 px-1 text-xs font-medium text-lab-green hover:underline"
-                >
-                  Kas raporunu gör
-                  <ChevronRight className="size-3.5" />
-                </Link>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
     </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Fizik                                                                     */
+/* -------------------------------------------------------------------------- */
+
+async function FizikTab({ athleteId }: { athleteId: string }) {
+  const supabase = await createSupabaseServerClient();
+  const { data: physiqueData } = await supabase
+    .from("physique_photos")
+    .select("*")
+    .eq("athlete_id", athleteId)
+    .order("photo_date", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(8);
+
+  const physique = (physiqueData ?? []) as PhysiquePhoto[];
+  const physiqueUrls = await signPhysiquePaths(
+    supabase,
+    physique.map((p) => p.storage_path),
+  );
+
+  if (physique.length === 0) {
+    return (
+      <EmptyState
+        icon={Camera}
+        title="Henüz fizik fotoğrafı yok"
+        description="Bu sporcu fizik takibine fotoğraf eklememiş."
+      />
+    );
+  }
+
+  return (
+    <section className="space-y-3">
+      <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+        <Camera className="size-4" /> Fizik takip
+      </h2>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {physique.map((p) => {
+          const url = physiqueUrls.get(p.storage_path);
+          if (!url) return null;
+          return (
+            <figure
+              key={p.id}
+              className="overflow-hidden rounded-xl border border-border"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={url}
+                alt={`Fizik — ${formatDate(p.photo_date)}`}
+                loading="lazy"
+                className="aspect-[3/4] w-full object-cover"
+              />
+              <figcaption className="flex items-baseline justify-between gap-2 p-2 font-mono text-xs tabular-nums">
+                <span>{formatDate(p.photo_date, "d MMM")}</span>
+                {p.weight_kg != null ? (
+                  <span className="text-muted-foreground">
+                    {formatNumber(p.weight_kg)} kg
+                  </span>
+                ) : null}
+              </figcaption>
+            </figure>
+          );
+        })}
+      </div>
+      <Link
+        href={`/panel/sporcular/${athleteId}/fizik`}
+        className="inline-flex items-center gap-1 text-xs font-medium text-lab-green hover:underline"
+      >
+        Tüm fotoğraflar + karşılaştırma
+        <ChevronRight className="size-3.5" />
+      </Link>
+    </section>
   );
 }
