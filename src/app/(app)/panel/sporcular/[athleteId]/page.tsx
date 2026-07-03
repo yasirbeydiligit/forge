@@ -429,7 +429,11 @@ async function AntrenmanTab({
 
       <WeekSwitcher {...weekNav} />
 
-      <CoachWeeklyReportView report={weekly.report} plateaus={weekly.plateaus} />
+      <CoachWeeklyReportView
+        report={weekly.report}
+        plateaus={weekly.plateaus}
+        prs={weekly.prs}
+      />
 
       {/* Raw set logs stay one click away — the digested reports above are the
           default reading surface for the coach. */}

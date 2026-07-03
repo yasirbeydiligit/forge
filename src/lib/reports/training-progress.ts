@@ -12,7 +12,7 @@
  * weight already achieved months ago never counts as a new record. Only
  * strength PR types count here; RIR-only PRs are deliberately excluded.
  */
-import { evaluatePR, type PRSet } from "@/lib/pr/evaluate-pr";
+import { countPrEvents } from "@/lib/pr/count-events";
 
 export type TrainingProgressConfig = {
   /** Last top set at/below (1 - ratio) × window-best top weight ⇒ anomaly. */
@@ -78,8 +78,6 @@ export type TrainingProgressReport = {
   muscles: MuscleProgress[];
 };
 
-const STRENGTH_PR = new Set(["weight", "reps", "both", "tradeoff"]);
-
 function topOf(sets: ProgressSet[], date: string): TopSet {
   let best: ProgressSet | null = null;
   for (const s of sets) {
@@ -118,18 +116,7 @@ export function buildTrainingProgress(
     if (inWindow.length === 0) continue;
 
     // PR events: each in-window set vs everything strictly before it.
-    let prCount = 0;
-    const history: PRSet[] = [];
-    for (const s of ordered) {
-      const current: PRSet = { weight: s.weight, reps: s.reps, rir: s.rir };
-      if (s.date >= windowStart) {
-        const result = evaluatePR(current, history);
-        if (result.isPR && result.type && STRENGTH_PR.has(result.type)) {
-          prCount += 1;
-        }
-      }
-      history.push(current);
-    }
+    const prCount = countPrEvents(ordered, windowStart);
 
     // Top set per in-window session date.
     const byDate = new Map<string, ProgressSet[]>();

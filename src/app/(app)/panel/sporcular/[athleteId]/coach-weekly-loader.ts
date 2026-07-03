@@ -7,6 +7,7 @@
  * Coach read access is enforced by RLS (the athlete-detail page already reads
  * the same tables).
  */
+import { countPrEvents, type DatedPRSet } from "@/lib/pr/count-events";
 import {
   buildCoachWeekly,
   type CoachWeeklyReport,
@@ -43,6 +44,8 @@ export type CoachWeeklyResult = {
   report: CoachWeeklyReport;
   /** exerciseId -> stall flag for the coach "attention" note. */
   plateaus: Record<string, { stalled: boolean; sessions: number }>;
+  /** exerciseId -> strength PR events inside the selected week. */
+  prs: Record<string, number>;
 };
 
 function toTargets(rows: TargetRow[]): TargetRef[] {
@@ -84,7 +87,7 @@ export async function loadCoachWeekly(
   const weekSessionIds = [...sessionDate.keys()];
 
   if (weekSessionIds.length === 0) {
-    return { report: { totalSets: 0, muscles: [] }, plateaus: {} };
+    return { report: { totalSets: 0, muscles: [] }, plateaus: {}, prs: {} };
   }
 
   const { data: rawSets } = await supabase
@@ -109,11 +112,71 @@ export async function loadCoachWeekly(
 
   const report = buildCoachWeekly(sets);
 
-  // ---- Plateau: per-exercise stall over the athlete's recent sessions ----
+  // ---- Plateau + weekly PR events for the exercises trained this week ----
   const weekExerciseIds = [...new Set(sets.map((s) => s.exerciseId))];
-  const plateaus = await loadPlateaus(supabase, athleteId, weekExerciseIds, weekEnd);
+  const [plateaus, prs] = await Promise.all([
+    loadPlateaus(supabase, athleteId, weekExerciseIds, weekEnd),
+    loadWeeklyPrs(supabase, athleteId, weekExerciseIds, weekStart, weekEnd),
+  ]);
 
-  return { report, plateaus };
+  return { report, plateaus, prs };
+}
+
+/** How far back PR evaluation looks for prior records (days). */
+const PR_HISTORY_DAYS = 365;
+
+/**
+ * Strength PR events per exercise inside [weekStart, weekEnd], with up to a
+ * year of prior sets as the reference frontier — mirrors the athlete-side PR
+ * engine so the coach's weekly "PR" column and the athlete's medals agree.
+ */
+async function loadWeeklyPrs(
+  supabase: Client,
+  athleteId: string,
+  exerciseIds: string[],
+  weekStart: string,
+  weekEnd: string,
+): Promise<Record<string, number>> {
+  if (exerciseIds.length === 0) return {};
+  const historyStart = new Date(weekEnd);
+  historyStart.setDate(historyStart.getDate() - PR_HISTORY_DAYS);
+  const historyStartKey = historyStart.toISOString().slice(0, 10);
+
+  const { data } = await supabase
+    .from("log_sets")
+    .select(
+      "weight, reps, rir, exercise_id, session:log_sessions!inner(athlete_id, session_date)",
+    )
+    .eq("log_sessions.athlete_id", athleteId)
+    .gte("log_sessions.session_date", historyStartKey)
+    .lte("log_sessions.session_date", weekEnd)
+    .in("exercise_id", exerciseIds);
+
+  type PrRow = {
+    weight: number | null;
+    reps: number | null;
+    rir: number | null;
+    exercise_id: string;
+    session: { session_date: string } | null;
+  };
+
+  const byExercise = new Map<string, DatedPRSet[]>();
+  for (const r of (data ?? []) as unknown as PrRow[]) {
+    if (!r.session) continue;
+    if (!byExercise.has(r.exercise_id)) byExercise.set(r.exercise_id, []);
+    byExercise.get(r.exercise_id)!.push({
+      date: r.session.session_date,
+      weight: r.weight != null ? Number(r.weight) : null,
+      reps: r.reps,
+      rir: r.rir != null ? Number(r.rir) : null,
+    });
+  }
+
+  const out: Record<string, number> = {};
+  for (const [exerciseId, exSets] of byExercise) {
+    out[exerciseId] = countPrEvents(exSets, weekStart, weekEnd);
+  }
+  return out;
 }
 
 async function loadPlateaus(
