@@ -34,12 +34,25 @@ type NavItem = {
   icon: LucideIcon;
   exact?: boolean;
   badge?: number;
+  /** rose = attention/alert badge; default is the primary green. */
+  badgeTone?: "primary" | "rose";
 };
 
-function buildNav(profile: Profile, unansweredCount: number) {
+function buildNav(
+  profile: Profile,
+  unansweredCount: number,
+  attentionCount: number,
+) {
   if (profile.role === "coach") {
     const primary: NavItem[] = [
-      { href: "/panel", label: "Panel", icon: LayoutDashboard, exact: true },
+      {
+        href: "/panel",
+        label: "Panel",
+        icon: LayoutDashboard,
+        exact: true,
+        badge: attentionCount,
+        badgeTone: "rose",
+      },
       { href: "/panel/programlar", label: "Programlar", icon: Dumbbell },
       { href: "/panel/takvim", label: "Takvim", icon: CalendarDays },
       { href: "/panel/sporcular", label: "Sporcular", icon: Users },
@@ -90,10 +103,15 @@ function useIsActive() {
     item.exact ? pathname === item.href : pathname.startsWith(item.href);
 }
 
-function NavBadge({ count }: { count?: number }) {
+function NavBadge({ count, tone }: { count?: number; tone?: "primary" | "rose" }) {
   if (!count) return null;
   return (
-    <Badge className="ml-auto h-5 min-w-5 justify-center rounded-full px-1.5 text-[11px]">
+    <Badge
+      className={cn(
+        "ml-auto h-5 min-w-5 justify-center rounded-full px-1.5 text-[11px]",
+        tone === "rose" && "bg-lab-rose text-white",
+      )}
+    >
       {count}
     </Badge>
   );
@@ -102,13 +120,15 @@ function NavBadge({ count }: { count?: number }) {
 export function AppShell({
   profile,
   unansweredCount,
+  attentionCount = 0,
   children,
 }: {
   profile: Profile;
   unansweredCount: number;
+  attentionCount?: number;
   children: React.ReactNode;
 }) {
-  const { primary, secondary } = buildNav(profile, unansweredCount);
+  const { primary, secondary } = buildNav(profile, unansweredCount, attentionCount);
   const isActive = useIsActive();
 
   return (
@@ -186,7 +206,14 @@ export function AppShell({
                 <span className="relative">
                   <Icon className="size-5" />
                   {item.badge ? (
-                    <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-foreground">
+                    <span
+                      className={cn(
+                        "absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold",
+                        item.badgeTone === "rose"
+                          ? "bg-lab-rose text-white"
+                          : "bg-primary text-primary-foreground",
+                      )}
+                    >
                       {item.badge}
                     </span>
                   ) : null}
@@ -215,7 +242,7 @@ function SideLink({ item, active }: { item: NavItem; active: boolean }) {
     >
       <Icon className="size-[18px] shrink-0" />
       <span className="truncate">{item.label}</span>
-      <NavBadge count={item.badge} />
+      <NavBadge count={item.badge} tone={item.badgeTone} />
     </Link>
   );
 }
