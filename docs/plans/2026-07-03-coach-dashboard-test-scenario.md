@@ -85,3 +85,34 @@ Toplam sorgu sayısı sporcu sayısından bağımsız (N+1 yok); tüm filtreler 
 
 - `npm run test` ✓ (tüm suite) · `npm run typecheck` ✓ · `npm run lint` ✓ ·
   `npm run build` ✓ (bu dokümanın commit'iyle aynı turda koşuldu).
+
+## 7. Geri bildirim turu (2026-07-03, akşam)
+
+Kullanıcı geri bildirimiyle üç değişiklik yapıldı ve aynı yöntemlerle
+doğrulandı:
+
+1. **Antrenman sekmesi — ham veri varsayılandan çıktı.** Yeni saf motor
+   `src/lib/reports/training-progress.ts` (12 vitest): kas → region → hareket
+   hiyerarşisi; hareket başına ilk→son top set ("100×5 → 105×6"), Faz-2
+   `evaluatePR` ile pencere-içi güç PR olayları (pencere ÖNCESİ tarihçe de
+   beslenir — eski rekor yeni PR sayılmaz; RIR-only PR sayılmaz), trend oku ve
+   **ani düşüş** anomalisi (son top set, dönem rekorunun ≥%15 altı, ≥3 seans).
+   Özet kartları: PR toplamı (X/Y harekette), seans, hareket, ani düşüş.
+   Ham seans listesi `<details>` ("Ham seans geçmişi") arkasına taşındı.
+   Görsel doğrulama: masaüstü+mobil ekran görüntüsü (fixture'lar gerçek motor
+   üzerinden; Squat 140×5→110×5 "ani düşüş" rozetiyle, Göğüs 5 PR / Lat 0 PR).
+2. **Takip sekmesi — sporcu takip sayfasının koç kopyası.** Renklendirme
+   mantığı `buildCellConfigs` olarak `src/lib/metrics.ts`'e çekildi (4 yeni
+   vitest; sporcu sayfası da aynı fonksiyonu kullanıyor — koç ve sporcu aynı
+   haftayı birebir aynı renklerle okur). `CoachTrackerWeek`: valence tintli
+   hafta tablosu (bugün vurgusu, not kolonu), haftalık ortalama MeasureCard'lar
+   (sparkline + iyi/kötü vurgu), haftalık kardiyo özeti + listesi. Koçun
+   `tracker_settings` SELECT hakkı 0024 politikasında mevcut (doğrulandı).
+3. **Hafta seçici belirginleşti.** Ortak `WeekSwitcher`
+   (`src/components/week-switcher.tsx`): tam genişlik kağıt şeridi, büyük
+   dokunma hedefleri, serif hafta etiketi, geçmişteyken "Bu haftaya dön"
+   kısayolu. Antrenman/Beslenme rapor başlıklarındaki minik çevronlar
+   kaldırıldı; üç sekme (Antrenman/Beslenme/Takip) sayfa seviyesinde tek
+   switcher kullanıyor, `?week=` sekmeyi koruyor.
+
+Final kapılar yeniden: 328 test ✓ · typecheck ✓ · lint ✓ · build ✓.

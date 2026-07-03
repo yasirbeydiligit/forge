@@ -100,6 +100,9 @@ inline fractal-noise SVG). **Higgsfield asset'i geldiğinde** tek satır:
   halkası; bant → green/amber/rose), `AlertItem`/`AlertGroups` (uyum = kesikli
   amber, performans = dolu viyole, kritik = rose; görüldü aksiyonlu),
   `DigestBanner` (günlük özet bandı). Koç paneli + sporcu detayı kullanır.
+- **`WeekSwitcher`** (`src/components/week-switcher.tsx`): belirgin hafta
+  gezgini — kağıt şerit, büyük chevron hedefleri, serif hafta etiketi,
+  "Bu haftaya dön" kısayolu. Koç rapor sekmelerinin tek hafta navigasyonu.
 
 ## İkonografi
 
