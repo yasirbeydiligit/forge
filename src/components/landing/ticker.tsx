@@ -10,17 +10,19 @@ import { useEffect, useRef } from "react";
 import gsap from "gsap";
 
 /* Pre-uppercased: CSS `uppercase` under lang="tr" would dot the I of the
- * English lift names (DEADLİFT). */
+ * English lift names (DEADLİFT). Product vocabulary: RIR (never RPE), and the
+ * strip samples the whole day — training, nutrition, cardio, tracker. */
 const ITEMS = [
-  "SQUAT 5×5 · 92,5 KG · RPE 8",
-  "BENCH 4×6 · 72,5 KG · RPE 7",
-  "DEADLIFT 3×3 · 140 KG · RPE 8",
-  "OHP 4×8 · 42,5 KG",
-  "SU 2,5 L / 3 L",
-  "PAUSE SQUAT 3×5 · 80 KG",
-  "UYKU 7 SA 40 DK",
+  "SQUAT 5×5 · 92,5 KG · RIR 2",
   "PROTEIN 156 G",
-  "ROW 4×10 · 60 KG",
+  "BENCH 4×6 · 72,5 KG · RIR 3",
+  "SU 2,5 L / 3 L",
+  "DEADLIFT 3×3 · 140 KG · RIR 1",
+  "ADIM 9.480",
+  "OHP 4×8 · 42,5 KG",
+  "UYKU 7 SA 24 DK",
+  "KARDIYO 32 DK · YÜRÜYÜŞ",
+  "PR · SQUAT 92,5 × 5",
 ];
 
 function Strip({ ariaHidden = false }: { ariaHidden?: boolean }) {

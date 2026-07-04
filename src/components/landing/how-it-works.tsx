@@ -21,7 +21,7 @@ const COLUMNS = [
     accent: "text-lab-blue",
     rule: "bg-lab-blue",
     title: "Koç yazar",
-    body: "Program haftalara ve günlere dökülür: set, tekrar, hedef kilo, RPE, dinlenme. Takvime atanır; herkes ne yapacağını bilir.",
+    body: "Program haftalara ve günlere dökülür: set, tekrar, hedef kilo, RIR, dinlenme. Takvime atanır; herkes ne yapacağını bilir.",
   },
   {
     no: "02",
@@ -35,7 +35,7 @@ const COLUMNS = [
     accent: "text-lab-amber",
     rule: "bg-lab-amber",
     title: "Birlikte izlenir",
-    body: "Koça ham veri değil sindirilmiş rapor gider: uyum, tonaj, kişisel rekorlar. Sorular ortak akışta cevap bulur.",
+    body: "Koça ham veri değil sindirilmiş rapor gider: uyum, set hacmi, kişisel rekorlar. Sorular ortak akışta cevap bulur.",
   },
 ] as const;
 

@@ -12,11 +12,13 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 
 gsap.registerPlugin(ScrollTrigger);
 
+/* Product decision: volume is SET COUNT (tonnage was removed app-wide), and
+ * the PR engine counts observed records — so the season reads in those units. */
 const STATS = [
   { value: 12, label: "hafta" },
   { value: 48, label: "antrenman" },
   { value: 4820, label: "set" },
-  { value: 212400, label: "kg tonaj" },
+  { value: 14, label: "kişisel rekor" },
 ];
 
 const formatTr = (n: number) => Math.round(n).toLocaleString("tr-TR");

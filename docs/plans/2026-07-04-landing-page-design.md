@@ -52,6 +52,25 @@ hareket, mevcut today/ desenindeki gibi küçük client sarmalayıcılarda
 - Pinleme yalnız `(min-width: 64rem)`; mobil dikey akışta pin yok.
 - Süre/ease dili mevcut tokenlarla uyumlu (power2.out, kısa süreler).
 
+## Revizyon 2 (aynı gün, kullanıcı geri bildirimi)
+
+İlk sürüm "logbook uygulaması" anlatıyordu; ürün artık çok daha geniş ve
+terminoloji yanlıştı. Düzeltmeler + genişletme (kullanıcıyla dört karar):
+
+- **Terminoloji:** RPE → **RIR** her yerde; **tonaj kaldırıldı** (ürün kararı:
+  hacim = set sayısı). Defter sahnesi ve ticker RIR diliyle yazılır; sezon
+  bandı: hafta · antrenman · set · **PR**.
+- **İki forma (spread):** "Sporcu için" (bugün, defter/RIR, beslenme, kardiyo,
+  takip, fizik, programlarım) ve "Koç için" (program yazımı, triage/uyarılar,
+  sindirilmiş haftalık rapor, davet).
+- **Kütüphane kendi bölümü:** hakemli makaleler + kaynaklı/alıntılı AI
+  cevapları + ekranlara düşen insight notları.
+- **İmza sahne + günün tamamı:** defter sahnesi (RIR diliyle) korunur;
+  ardından animasyonlu "günün tamamı" grid'i (makro barları dolar, su, adım,
+  kardiyo, uyku) — Forge'un tüm günü kapsadığını gösterir.
+- Metin içeriği, Explore ajanının ekran-ekran envanterindeki birebir Türkçe
+  etiketlerle hizalanır (uygulamanın kendi sözcükleriyle pazarlama).
+
 ## Doğrulama
 
 - `npm run typecheck` + `lint` + `build`.
