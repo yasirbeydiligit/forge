@@ -18,19 +18,32 @@ export function SignupForm({ token }: { token: string }) {
     <form action={formAction} className="space-y-4">
       <input type="hidden" name="token" value={token} />
 
+      {/* Printed-form fields, matching the login card: tracked uppercase
+          labels over a bottom hairline that inks green on focus. */}
       <div className="space-y-2">
-        <Label htmlFor="fullName">Ad soyad</Label>
+        <Label
+          htmlFor="fullName"
+          className="text-[0.6875rem] font-medium tracking-[0.16em] uppercase text-muted-foreground"
+        >
+          Ad soyad
+        </Label>
         <Input
           id="fullName"
           name="fullName"
           autoComplete="name"
           placeholder="Adın ve soyadın"
           required
+          className="rounded-none border-0 border-b border-input bg-transparent px-0 shadow-none focus-visible:border-b-2 focus-visible:border-primary focus-visible:ring-0"
         />
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="email">E-posta</Label>
+        <Label
+          htmlFor="email"
+          className="text-[0.6875rem] font-medium tracking-[0.16em] uppercase text-muted-foreground"
+        >
+          E-posta
+        </Label>
         <Input
           id="email"
           name="email"
@@ -38,11 +51,17 @@ export function SignupForm({ token }: { token: string }) {
           autoComplete="email"
           placeholder="ornek@eposta.com"
           required
+          className="rounded-none border-0 border-b border-input bg-transparent px-0 shadow-none focus-visible:border-b-2 focus-visible:border-primary focus-visible:ring-0"
         />
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="password">Şifre</Label>
+        <Label
+          htmlFor="password"
+          className="text-[0.6875rem] font-medium tracking-[0.16em] uppercase text-muted-foreground"
+        >
+          Şifre
+        </Label>
         <Input
           id="password"
           name="password"
@@ -51,6 +70,7 @@ export function SignupForm({ token }: { token: string }) {
           placeholder="En az 6 karakter"
           minLength={6}
           required
+          className="rounded-none border-0 border-b border-input bg-transparent px-0 shadow-none focus-visible:border-b-2 focus-visible:border-primary focus-visible:ring-0"
         />
       </div>
 
