@@ -107,7 +107,7 @@ export function LandingHero() {
         className="text-label flex items-baseline justify-between border-b border-border pb-3 text-muted-foreground"
       >
         <span>Sayı 01 — Temmuz 2026</span>
-        <span className="hidden sm:inline">Antrenman defteri</span>
+        <span className="hidden sm:inline">Antrenman platformu</span>
         <span>Kapalı topluluk</span>
       </div>
 
@@ -141,8 +141,8 @@ export function LandingHero() {
           data-hero-deck
           className="mx-auto mt-5 max-w-md text-base leading-relaxed text-muted-foreground sm:text-lg"
         >
-          Koçun programı yazar; sen salonda uygularsın. Her set, her kilo, her
-          tekrar — hepsi deftere işlenir.
+          Koçun programı yazar; sen salonda uygularsın. Antrenman, beslenme,
+          kardiyo, günlük takip — günün tamamı deftere işlenir.
         </p>
         <div
           data-hero-deck

@@ -10,8 +10,11 @@ import Link from "next/link";
 import { Brand } from "@/components/brand";
 import { PaperGrain } from "@/components/paper-grain";
 import { Button } from "@/components/ui/button";
+import { AthleteSpread } from "@/components/landing/athlete-spread";
+import { CoachSpread } from "@/components/landing/coach-spread";
 import { LandingHero } from "@/components/landing/hero";
 import { HowItWorks } from "@/components/landing/how-it-works";
+import { LibrarySection } from "@/components/landing/library-section";
 import { LogbookScene } from "@/components/landing/logbook-scene";
 import { RegisterTicker } from "@/components/landing/ticker";
 import { ScrollReveal } from "@/components/landing/scroll-reveal";
@@ -36,6 +39,9 @@ export function LandingPage() {
         <RegisterTicker />
         <HowItWorks />
         <LogbookScene />
+        <AthleteSpread />
+        <CoachSpread />
+        <LibrarySection />
         <SeasonStats />
 
         {/* Pull quote, in the app's signature left-stripe research-card voice. */}
@@ -60,8 +66,9 @@ export function LandingPage() {
             Forge davetle çalışır.
           </h2>
           <p className="mx-auto mt-4 max-w-md text-sm leading-relaxed text-muted-foreground sm:text-base">
-            Kayıt yalnızca koçundan gelen davet bağlantısıyla açılır. Hesabın
-            varsa giriş yap; yoksa koçundan bir davet linki iste.
+            Kayıt yalnızca koçundan gelen davet bağlantısıyla açılır — tek
+            kullanımlık ya da süreli. Hesabın varsa giriş yap; yoksa koçundan
+            bir davet linki iste.
           </p>
           <div className="mt-8 flex justify-center">
             <Button asChild size="lg" className="px-10">

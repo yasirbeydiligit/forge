@@ -16,12 +16,14 @@ import { cn } from "@/lib/utils";
 
 gsap.registerPlugin(ScrollTrigger);
 
+/* Specimen sets in the product's own vocabulary: RIR (yedekte kalan tekrar),
+ * never RPE; the "+2,5" is the vs-last delta the real logger shows. */
 const SETS = [
-  { no: 1, load: "92,5 kg × 5", rpe: "RPE 8" },
-  { no: 2, load: "92,5 kg × 5", rpe: "RPE 8" },
-  { no: 3, load: "92,5 kg × 5", rpe: "RPE 8,5" },
-  { no: 4, load: "92,5 kg × 5", rpe: "RPE 8,5" },
-  { no: 5, load: "92,5 kg × 5", rpe: "RPE 9", pr: true },
+  { no: 1, load: "92,5 kg × 5", delta: "+2,5", rir: "RIR 2" },
+  { no: 2, load: "92,5 kg × 5", rir: "RIR 2" },
+  { no: 3, load: "92,5 kg × 5", rir: "RIR 2" },
+  { no: 4, load: "92,5 kg × 5", rir: "RIR 1" },
+  { no: 5, load: "92,5 kg × 5", rir: "RIR 1", pr: true },
 ];
 
 export function LogbookScene() {
@@ -108,8 +110,11 @@ export function LogbookScene() {
             </h2>
             <p className="mt-4 max-w-sm text-sm leading-relaxed text-muted-foreground">
               Uygulamada gördüğün sayfa budur: hedef satırın önünde durur, sen
-              doldurursun. Beşinci set bir rekora denk gelirse, sayfa bunu
-              senden önce fark eder.
+              doldurursun. Son seansa göre farkın yanında yazar; beşinci set
+              bir rekora denk gelirse, sayfa bunu senden önce fark eder.
+            </p>
+            <p className="text-caption mt-3 max-w-sm font-mono text-muted-foreground/80">
+              RIR = Yedekte kalan tekrar (0 = tam başarısızlık)
             </p>
           </div>
 
@@ -123,7 +128,7 @@ export function LogbookScene() {
               <div className="mt-3 flex items-baseline justify-between border-b border-paper-border pb-3">
                 <h3 className="text-h2 text-lab-ink">Back Squat</h3>
                 <p className="font-mono text-xs text-muted-foreground">
-                  Hedef 5×5 · 92,5 kg · RPE 8
+                  Hedef 5×5 · 92,5 kg · RIR 2
                 </p>
               </div>
             </div>
@@ -138,14 +143,21 @@ export function LogbookScene() {
                   <span className="w-7 text-xs text-muted-foreground">
                     S{set.no}
                   </span>
-                  <span className="flex-1 tabular-nums">{set.load}</span>
+                  <span className="flex-1 tabular-nums">
+                    {set.load}
+                    {set.delta ? (
+                      <span className="ml-2 text-xs text-lab-green">
+                        {set.delta}
+                      </span>
+                    ) : null}
+                  </span>
                   <span
                     className={cn(
                       "text-xs",
                       set.pr ? "text-lab-green" : "text-muted-foreground",
                     )}
                   >
-                    {set.rpe}
+                    {set.rir}
                   </span>
                   <span
                     data-set-check
@@ -165,7 +177,7 @@ export function LogbookScene() {
                 Oturum kaydı tamam
               </span>
               <span className="font-mono text-xs tabular-nums text-muted-foreground">
-                Tonaj 2.312 kg
+                Hacim 24 set · 1 PR
               </span>
             </div>
 
