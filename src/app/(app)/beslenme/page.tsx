@@ -7,7 +7,7 @@ import { deleteMeal } from "./actions";
 import { MealDialog } from "./meal-dialog";
 import { ProtocolChecklist, type ProtocolItem } from "./protocol-checklist";
 import { TargetsDialog } from "./targets-dialog";
-import { WaterTracker } from "./water-tracker";
+import { HydrationBottle } from "@/components/today/hydration-bottle";
 import {
   LabHeader,
   LabPage,
@@ -198,10 +198,11 @@ export default async function NutritionPage({
       </PaperCard>
 
       <div className="mt-4">
-        <WaterTracker
+        <HydrationBottle
           date={dateKey}
           current={waterMl}
           target={target?.water_ml ?? null}
+          variant="compact"
         />
       </div>
 
