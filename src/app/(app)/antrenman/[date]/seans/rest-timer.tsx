@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import gsap from "gsap";
 import { Minus, Plus, Timer, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -57,6 +58,31 @@ export function RestTimer({
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
 
+  // With motion allowed, GSAP owns the ring: one linear sweep from the current
+  // arc to empty over the exact remaining time, restarted on ±30s. The stepped
+  // React value + inline transition below stay as the reduced-motion / no-JS
+  // fallback (GSAP disables the transition while it drives).
+  const ringRef = useRef<SVGCircleElement>(null);
+  useEffect(() => {
+    const el = ringRef.current;
+    if (!el) return;
+    const mm = gsap.matchMedia();
+    mm.add("(prefers-reduced-motion: no-preference)", () => {
+      const remainingNow = Math.max(0, endsAt - Date.now());
+      const totalNow = Math.max(1, totalSeconds * 1000);
+      const ctx = gsap.context(() => {
+        gsap.set(el, { transition: "none" });
+        gsap.fromTo(
+          el,
+          { strokeDashoffset: c * (1 - Math.min(1, remainingNow / totalNow)) },
+          { strokeDashoffset: c, duration: remainingNow / 1000, ease: "none" },
+        );
+      });
+      return () => ctx.revert();
+    });
+    return () => mm.revert();
+  }, [endsAt, totalSeconds, c]);
+
   return (
     <div
       className={cn(
@@ -79,6 +105,7 @@ export function RestTimer({
         <svg width={size} height={size} className="-rotate-90 shrink-0">
           <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--surface)" strokeWidth={stroke} />
           <circle
+            ref={ringRef}
             cx={size / 2}
             cy={size / 2}
             r={r}

@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import gsap from "gsap";
 import {
   ArrowRight,
   Check,
@@ -414,6 +415,44 @@ function LoggedSets({
   sets: Player["state"]["exercises"][number]["sets"];
   onDelete: (localId: string) => void;
 }) {
+  const listRef = useRef<HTMLDivElement>(null);
+  // Rows that already had their entrance, so a re-render never replays them:
+  // switching to an exercise staggers its whole table in (RevealStagger
+  // pattern), each newly logged set lifts in alone. Reset per exercise so a
+  // revisit gets its entrance again. Rows render visible without JS.
+  const revealedRef = useRef({ exerciseId: meta.workoutExerciseId, ids: new Set<string>() });
+
+  useEffect(() => {
+    const root = listRef.current;
+    if (!root) return;
+    if (revealedRef.current.exerciseId !== meta.workoutExerciseId) {
+      revealedRef.current = { exerciseId: meta.workoutExerciseId, ids: new Set() };
+    }
+    const seen = revealedRef.current.ids;
+    const fresh = Array.from(root.querySelectorAll<HTMLElement>("[data-set-row]")).filter((el) => {
+      const id = el.dataset.setRow ?? "";
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+    if (fresh.length === 0) return;
+
+    const mm = gsap.matchMedia();
+    mm.add("(prefers-reduced-motion: no-preference)", () => {
+      const ctx = gsap.context(() => {
+        gsap.from(fresh, {
+          y: 10,
+          autoAlpha: 0,
+          duration: 0.4,
+          ease: "power2.out",
+          stagger: 0.06,
+        });
+      }, root);
+      return () => ctx.revert();
+    });
+    return () => mm.revert();
+  }, [sets, meta.workoutExerciseId]);
+
   if (sets.length === 0) {
     return (
       <p className="rounded-xl border border-dashed border-border px-4 py-5 text-center text-sm text-muted-foreground">
@@ -422,7 +461,7 @@ function LoggedSets({
     );
   }
   return (
-    <div className="overflow-hidden rounded-xl border border-paper-border">
+    <div ref={listRef} className="overflow-hidden rounded-xl border border-paper-border">
       <div className="grid grid-cols-[1.5rem_1fr_1fr_1fr_1.75rem] items-center gap-2 bg-surface px-3 py-1.5 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
         <span className="text-center">Set</span>
         <span className="text-center">Kg</span>
@@ -439,6 +478,7 @@ function LoggedSets({
         return (
           <div
             key={s.localId}
+            data-set-row={s.localId}
             className={cn(
               "grid grid-cols-[1.5rem_1fr_1fr_1fr_1.75rem] items-center gap-2 border-t border-paper-border px-3 py-2 text-sm",
               s.pr && "forge-pr-glow",
