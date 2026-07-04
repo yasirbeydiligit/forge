@@ -5,6 +5,7 @@ import { ArrowLeft, Check, Loader2, Send, Sparkles } from "lucide-react";
 
 import { InsightNote } from "@/components/library/insight-note";
 import { MarginNote } from "@/components/lab/lab";
+import { AnimatedNumber } from "@/components/today/animated-number";
 import { formatNumber } from "@/lib/format";
 import type { SessionReport } from "@/lib/reports/session-report";
 import type { AthleteInsight } from "@/lib/rag/insights-server";
@@ -82,9 +83,9 @@ export function SessionSummary({
 
       {/* Hero metrics — "hacim" is set count in this product, never tonnage. */}
       <div className="grid grid-cols-3 gap-px overflow-hidden rounded-2xl border border-paper-border bg-paper-border">
-        <Metric label="Süre" value={fmtDuration(durationMs)} />
-        <Metric label="Hacim" value={String(setCount)} unit="set" />
-        <Metric label="Tekrar" value={String(totalReps)} sub={`${prCount} PR`} />
+        <Metric label="Süre" value={<AnimatedDuration ms={durationMs} />} />
+        <Metric label="Hacim" value={<AnimatedNumber value={setCount} />} unit="set" />
+        <Metric label="Tekrar" value={<AnimatedNumber value={totalReps} />} sub={`${prCount} PR`} />
       </div>
 
       {!hasReport && prCount > 0 ? (
@@ -225,6 +226,25 @@ export function SessionSummary({
   );
 }
 
+/** fmtDuration ("2 sa 5 dk" / "42 dk"), but the figures count up on mount. */
+function AnimatedDuration({ ms }: { ms: number }) {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  return (
+    <>
+      {h > 0 ? (
+        <>
+          <AnimatedNumber value={h} />
+          <span className="ml-0.5 mr-1 font-mono text-xs text-paper-muted">sa</span>
+        </>
+      ) : null}
+      <AnimatedNumber value={m} />
+      <span className="ml-0.5 font-mono text-xs text-paper-muted">dk</span>
+    </>
+  );
+}
+
 function Metric({
   label,
   value,
@@ -233,7 +253,7 @@ function Metric({
   delta,
 }: {
   label: string;
-  value: string;
+  value: React.ReactNode;
   unit?: string;
   sub?: string;
   delta?: number | null;

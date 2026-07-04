@@ -1,9 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import gsap from "gsap";
 import { Check, Minus, Plus } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+
+/* The player remounts <SetInput> after every logged set (its key includes the
+ * set count), so an animation started in the click handler dies with the old
+ * instance. Stamp the submit time at module scope instead and let the next
+ * instance pop its check on mount — visually one continuous "tick". */
+let lastLoggedAt = 0;
 
 type Props = {
   setNumber: number;
@@ -110,10 +117,26 @@ export function SetInput({
   const [showRir, setShowRir] = useState(false);
   const [showNote, setShowNote] = useState(false);
 
+  const tickRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    const el = tickRef.current;
+    if (!el || Date.now() - lastLoggedAt > 600) return;
+    const mm = gsap.matchMedia();
+    mm.add("(prefers-reduced-motion: no-preference)", () => {
+      const ctx = gsap.context(() => {
+        gsap.from(el, { scale: 0, rotation: -30, duration: 0.3, ease: "back.out(2.5)" });
+      });
+      return () => ctx.revert();
+    });
+    return () => mm.revert();
+  }, []);
+
   const submit = () => {
     const w = parseNum(weight) ?? suggestedWeight;
     const r = parseNum(reps) ?? suggestedReps;
     if (w == null && r == null) return;
+    lastLoggedAt = Date.now();
     onComplete({
       weight: w,
       reps: r,
@@ -206,7 +229,10 @@ export function SetInput({
         onClick={submit}
         className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-base font-semibold text-primary-foreground shadow-raised transition-[transform,background-color] duration-[var(--dur-fast)] ease-soft active:scale-[0.98] active:bg-primary/90"
       >
-        <Check className="size-5" /> Set tamamlandı
+        <span ref={tickRef} className="inline-flex">
+          <Check className="size-5" />
+        </span>
+        Set tamamlandı
       </button>
     </div>
   );
