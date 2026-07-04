@@ -89,8 +89,11 @@ inline fractal-noise SVG). **Higgsfield asset'i geldiğinde** tek satır:
   Panel hep bunu kullanır.
 - **`MacroBar`** (`src/components/nutrition/macro-bar.tsx`): mount'ta dolan,
   yüzde + hedef-aşımı gösteren makro barı.
-- **`WaterTracker`** (`src/app/(app)/beslenme/water-tracker.tsx`): hedefe dolan
-  bardak; optimistik, bardak-bardak su kaydı (`daily_metrics.water_ml`).
+- **`HydrationBottle`** (`src/components/today/hydration-bottle.tsx`): hidrasyonu
+  bir _nesneye_ çeviren SVG şişe — GSAP'li iki kayan sinüs dalgası hedefe doğru
+  yükselir; optimistik, bardak-bardak su kaydı (`daily_metrics.water_ml`).
+  `variant: hero` (Bugün) / `compact` (Beslenme). Eski `WaterTracker`'ın yerini
+  aldı.
 - **`Sparkline`** (`src/components/logbook/sparkline.tsx`): saf-SVG, `color` prop.
 - **`InsightNote`** (`src/components/library/insight-note.tsx`): imza alıntı
   kartı; alan→renk (`nutrition→green, recovery→amber, training→blue`).
@@ -103,6 +106,12 @@ inline fractal-noise SVG). **Higgsfield asset'i geldiğinde** tek satır:
 - **`WeekSwitcher`** (`src/components/week-switcher.tsx`): belirgin hafta
   gezgini — kağıt şerit, büyük chevron hedefleri, serif hafta etiketi,
   "Bu haftaya dön" kısayolu. Koç rapor sekmelerinin tek hafta navigasyonu.
+- **Hareket dili** (`src/components/today/`): sporcu ekranlarına taşınabilir,
+  tümü `prefers-reduced-motion` korumalı yeniden-kullanılabilir set — `WeekStrip`
+  (bugün nefes-ring + planlı/tamamlandı hafta şeridi), `AnimatedNumber` (mount'ta
+  0→değer sayan hero rakam; `decimals`/`grouped` ile serileştirilebilir format),
+  `RevealStagger` (bölümleri alttan yükselten giriş). `ScoreRing` deseniyle aynı
+  GSAP + reduced-motion konvansiyonu.
 
 ## İkonografi
 
@@ -122,9 +131,11 @@ yerleri aynı kalır. Egzersiz satırları ve Kütüphane ilk adaptasyon hedefle
 
 ## Ekran durumu
 
-Görsel/UX katmanı uygulanan ekranlar: **Takvim** (sporcu + koç), **İlerleme /
-Takip / Panel** (MeasureCard), **Beslenme** (canlı makro + su), **Feed**,
-**Kütüphane**, **Panel hızlı işlemler**, **mobil alt navigasyon**.
+Görsel/UX katmanı uygulanan ekranlar: **Bugün** (komuta merkezi — hafta şeridi,
+akıllı antrenman girişi, özet kutuları, SVG+GSAP hidrasyon), **Takvim** (sporcu +
+koç), **İlerleme / Takip / Panel** (MeasureCard), **Beslenme** (canlı makro + su),
+**Feed**, **Kütüphane**, **Panel hızlı işlemler**, **mobil alt navigasyon**.
 
-İleride: "Tamamla" başarı animasyonu (logbook), özel ikon seti adaptasyonu,
+İleride: Bugün hareket dilinin (`src/components/today/`) İlerleme/Takip/Panel'e
+taşınması, "Tamamla" başarı animasyonu (logbook), özel ikon seti adaptasyonu,
 Higgsfield asset'lerinin bağlanması.
