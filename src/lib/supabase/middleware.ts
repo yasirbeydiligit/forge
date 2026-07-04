@@ -4,7 +4,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/lib/database.types";
 import { env } from "@/lib/env";
 
-/** Paths reachable without an authenticated session. */
+/** Paths reachable without an authenticated session. The landing at "/" is
+ * also public, but is handled separately: signed-in users stay on it and the
+ * page routes them to their role home instead of the middleware bouncing. */
 const PUBLIC_PATHS = ["/login", "/kayit", "/offline"];
 
 function isPublicPath(pathname: string) {
@@ -49,7 +51,7 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  if (!user && !isPublicPath(pathname)) {
+  if (!user && pathname !== "/" && !isPublicPath(pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("redirect", pathname);

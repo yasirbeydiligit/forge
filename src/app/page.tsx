@@ -1,11 +1,12 @@
 import { redirect } from "next/navigation";
 
+import { LandingPage } from "@/components/landing/landing-page";
 import { getProfile } from "@/lib/auth";
 
-/** Entry point: route users to the right experience based on their role. */
+/** Entry point: signed-in users go to their home; visitors see the landing. */
 export default async function HomePage() {
   const profile = await getProfile();
-  if (!profile) redirect("/login");
-  if (profile.role === "coach") redirect("/panel");
-  redirect("/bugun");
+  if (profile?.role === "coach") redirect("/panel");
+  if (profile) redirect("/bugun");
+  return <LandingPage />;
 }
