@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * Generic scroll-entrance for the landing's static sections: children lift in
- * with a soft stagger the first time they enter the viewport. Server-rendered
- * markup stays fully visible without motion — the same contract as the app's
+ * Generic scroll-entrance for static page sections: children lift in with a
+ * soft stagger the first time they enter the viewport. Server-rendered markup
+ * stays fully visible without motion — the same contract as the app's
  * RevealStagger, but scroll-triggered.
  */
 import { useEffect, useRef } from "react";

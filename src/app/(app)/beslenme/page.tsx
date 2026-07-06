@@ -7,6 +7,7 @@ import { deleteMeal } from "./actions";
 import { MealDialog } from "./meal-dialog";
 import { ProtocolChecklist, type ProtocolItem } from "./protocol-checklist";
 import { TargetsDialog } from "./targets-dialog";
+import { AnimatedNumber } from "@/components/today/animated-number";
 import { HydrationBottle } from "@/components/today/hydration-bottle";
 import {
   LabHeader,
@@ -14,6 +15,7 @@ import {
   PaperCard,
   SectionLabel,
 } from "@/components/lab/lab";
+import { ScrollReveal } from "@/components/landing/scroll-reveal";
 import { InsightNotes } from "@/components/library/insight-note";
 import { CalorieBar, MacroBar } from "@/components/nutrition/macro-bar";
 import { Button } from "@/components/ui/button";
@@ -125,94 +127,96 @@ export default async function NutritionPage({
         subtitle={`${meals.length} öğün${target?.kcal ? ` · hedef ${target.kcal} kcal` : ""}`}
       />
 
-      <div className="mb-4 flex items-center justify-between gap-2">
-        <div className="flex gap-1">
-          <Button asChild variant="outline" size="icon">
-            <Link href={`/beslenme?date=${prevKey}`} aria-label="Önceki gün">
-              <ChevronLeft className="size-4" />
-            </Link>
-          </Button>
-          <Button asChild variant="outline" size="icon">
-            <Link href={`/beslenme?date=${nextKey}`} aria-label="Sonraki gün">
-              <ChevronRight className="size-4" />
-            </Link>
-          </Button>
+      <ScrollReveal>
+        <div className="mb-4 flex items-center justify-between gap-2">
+          <div className="flex gap-1">
+            <Button asChild variant="outline" size="icon">
+              <Link href={`/beslenme?date=${prevKey}`} aria-label="Önceki gün">
+                <ChevronLeft className="size-4" />
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="icon">
+              <Link href={`/beslenme?date=${nextKey}`} aria-label="Sonraki gün">
+                <ChevronRight className="size-4" />
+              </Link>
+            </Button>
+          </div>
+          <div className="flex gap-2">
+            <Button asChild variant="outline" size="sm">
+              <Link href="/beslenme/hazir-ogunler">Hazır öğünlerim</Link>
+            </Button>
+            <TargetsDialog target={target} />
+            <MealDialog date={dateKey} templates={templates} />
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Button asChild variant="outline" size="sm">
-            <Link href="/beslenme/hazir-ogunler">Hazır öğünlerim</Link>
-          </Button>
-          <TargetsDialog target={target} />
-          <MealDialog date={dateKey} templates={templates} />
-        </div>
-      </div>
 
-      <PaperCard className="p-5">
-        <div className="flex items-baseline justify-between">
-          <SectionLabel className="text-paper-muted">Bugün</SectionLabel>
-          {remaining != null ? (
-            <span className="text-xs text-paper-muted">
-              {remaining >= 0
-                ? `${remaining} kcal kaldı`
-                : `${Math.abs(remaining)} kcal aşıldı`}
-            </span>
-          ) : null}
-        </div>
-        <p className="mt-1 font-serif text-3xl tabular-nums text-paper-foreground">
-          {totalKcal.toLocaleString("tr-TR")}
+        <PaperCard className="p-5">
+          <div className="flex items-baseline justify-between">
+            <SectionLabel className="text-paper-muted">Bugün</SectionLabel>
+            {remaining != null ? (
+              <span className="text-xs text-paper-muted">
+                {remaining >= 0
+                  ? `${remaining} kcal kaldı`
+                  : `${Math.abs(remaining)} kcal aşıldı`}
+              </span>
+            ) : null}
+          </div>
+          <p className="mt-1 font-serif text-3xl tabular-nums text-paper-foreground">
+            <AnimatedNumber value={totalKcal} />
+            {target?.kcal ? (
+              <span className="text-xl text-paper-muted">
+                {" "}
+                / {target.kcal.toLocaleString("tr-TR")}
+              </span>
+            ) : null}
+            <span className="ml-1 text-sm font-normal text-paper-muted">kcal</span>
+          </p>
+
           {target?.kcal ? (
-            <span className="text-xl text-paper-muted">
-              {" "}
-              / {target.kcal.toLocaleString("tr-TR")}
-            </span>
+            <div className="mt-3">
+              <CalorieBar value={totalKcal} target={target.kcal} />
+            </div>
           ) : null}
-          <span className="ml-1 text-sm font-normal text-paper-muted">kcal</span>
-        </p>
 
-        {target?.kcal ? (
-          <div className="mt-3">
-            <CalorieBar value={totalKcal} target={target.kcal} />
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <MacroBar
+              label="Protein"
+              value={sum(meals, "protein")}
+              target={target?.protein ?? null}
+              accent="green"
+            />
+            <MacroBar
+              label="Karbonhidrat"
+              value={sum(meals, "carbs")}
+              target={target?.carbs ?? null}
+              accent="amber"
+            />
+            <MacroBar
+              label="Yağ"
+              value={sum(meals, "fat")}
+              target={target?.fat ?? null}
+              accent="violet"
+            />
+          </div>
+        </PaperCard>
+
+        <div className="mt-4">
+          <HydrationBottle
+            date={dateKey}
+            current={waterMl}
+            target={target?.water_ml ?? null}
+            variant="compact"
+          />
+        </div>
+
+        {protocols.length > 0 ? (
+          <div className="mt-4">
+            <ProtocolChecklist date={dateKey} protocols={protocols} />
           </div>
         ) : null}
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          <MacroBar
-            label="Protein"
-            value={sum(meals, "protein")}
-            target={target?.protein ?? null}
-            accent="green"
-          />
-          <MacroBar
-            label="Karbonhidrat"
-            value={sum(meals, "carbs")}
-            target={target?.carbs ?? null}
-            accent="amber"
-          />
-          <MacroBar
-            label="Yağ"
-            value={sum(meals, "fat")}
-            target={target?.fat ?? null}
-            accent="violet"
-          />
-        </div>
-      </PaperCard>
-
-      <div className="mt-4">
-        <HydrationBottle
-          date={dateKey}
-          current={waterMl}
-          target={target?.water_ml ?? null}
-          variant="compact"
-        />
-      </div>
-
-      {protocols.length > 0 ? (
-        <div className="mt-4">
-          <ProtocolChecklist date={dateKey} protocols={protocols} />
-        </div>
-      ) : null}
-
-      <InsightNotes insights={insights} className="mt-4 space-y-3" />
+        <InsightNotes insights={insights} className="mt-4 space-y-3" />
+      </ScrollReveal>
 
       <section className="mt-8 space-y-3">
         <SectionLabel>Zaman çizelgesi</SectionLabel>
@@ -224,7 +228,7 @@ export default async function NutritionPage({
             </p>
           </PaperCard>
         ) : (
-          <div className="space-y-2">
+          <ScrollReveal className="space-y-2">
             {meals.map((m) => (
               <PaperCard key={m.id} className="flex items-start gap-3 p-4">
                 <span className="w-12 shrink-0 font-mono text-xs tabular-nums text-paper-muted">
@@ -256,7 +260,7 @@ export default async function NutritionPage({
                 </form>
               </PaperCard>
             ))}
-          </div>
+          </ScrollReveal>
         )}
       </section>
     </LabPage>
