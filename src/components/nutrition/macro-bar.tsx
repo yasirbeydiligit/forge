@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef } from "react";
+import gsap from "gsap";
 import { Check } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -43,43 +44,61 @@ function classify(
   };
 }
 
-/** Animate fills in on mount; the global reduced-motion rule flattens it. */
-function useGrown() {
-  const [grown, setGrown] = useState(false);
-  useEffect(() => {
-    const id = requestAnimationFrame(() => setGrown(true));
-    return () => cancelAnimationFrame(id);
-  }, []);
-  return grown;
-}
-
+/**
+ * Fill segments render at their final width — fully visible without JS — and
+ * GSAP grows them in on mount with a left-origin scaleX, the overshoot segment
+ * trailing the accent fill. Later value changes (e.g. after logging a meal)
+ * still glide via the CSS width transition.
+ */
 function Bar({
   accent,
   accentPct,
   overPct,
-  grown,
 }: {
   accent: Accent;
   accentPct: number;
   overPct: number;
-  grown: boolean;
 }) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const root = ref.current;
+    if (!root) return;
+
+    const mm = gsap.matchMedia();
+    mm.add("(prefers-reduced-motion: no-preference)", () => {
+      const ctx = gsap.context(() => {
+        gsap.from(root.querySelectorAll("[data-fill]"), {
+          scaleX: 0,
+          transformOrigin: "left center",
+          duration: 0.6,
+          ease: "power2.out",
+          stagger: 0.12,
+        });
+      }, root);
+      return () => ctx.revert();
+    });
+    return () => mm.revert();
+  }, []);
+
   return (
-    <div className="relative h-2 overflow-hidden rounded-full bg-paper-foreground/10">
+    <div
+      ref={ref}
+      className="relative h-2 overflow-hidden rounded-full bg-paper-foreground/10"
+    >
       <div
+        data-fill
         className={cn(
           "absolute inset-y-0 left-0 rounded-full transition-[width] duration-[var(--dur-slow)] ease-soft",
           ACCENTS[accent],
         )}
-        style={{ width: `${grown ? accentPct : 0}%` }}
+        style={{ width: `${accentPct}%` }}
       />
       {overPct > 0 ? (
         <div
+          data-fill
           className="absolute inset-y-0 rounded-full bg-destructive transition-[width,left] duration-[var(--dur-slow)] ease-soft"
-          style={{
-            left: `${grown ? accentPct : 0}%`,
-            width: `${grown ? overPct : 0}%`,
-          }}
+          style={{ left: `${accentPct}%`, width: `${overPct}%` }}
         />
       ) : null}
     </div>
@@ -115,7 +134,6 @@ export function MacroBar({
   target: number | null;
   accent: Accent;
 }) {
-  const grown = useGrown();
   const { status, pct, accentPct, overPct } = classify(value, target);
   const remaining = (target ?? 0) - value;
 
@@ -129,12 +147,7 @@ export function MacroBar({
         </span>
       </div>
       <div className="mt-1.5">
-        <Bar
-          accent={accent}
-          accentPct={accentPct}
-          overPct={overPct}
-          grown={grown}
-        />
+        <Bar accent={accent} accentPct={accentPct} overPct={overPct} />
       </div>
       {status !== "none" ? (
         <p className="mt-1 flex items-center gap-1 font-mono text-[10px] tabular-nums">
@@ -168,14 +181,13 @@ export function CalorieBar({
   value: number;
   target: number | null;
 }) {
-  const grown = useGrown();
   const { status, pct, accentPct, overPct } = classify(value, target);
   const remaining = (target ?? 0) - value;
   if (status === "none") return null;
 
   return (
     <div>
-      <Bar accent="green" accentPct={accentPct} overPct={overPct} grown={grown} />
+      <Bar accent="green" accentPct={accentPct} overPct={overPct} />
       <p className="mt-1 font-mono text-[10px] tabular-nums">
         {status === "over" ? (
           <span className="text-destructive">
