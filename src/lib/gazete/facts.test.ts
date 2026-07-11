@@ -15,7 +15,6 @@ function baseAgg(overrides: Partial<PeriodAggregates> = {}): PeriodAggregates {
     daysInPeriod: 7,
     sessionsCompleted: 0,
     totalSets: 0,
-    tonnageKg: 0,
     prCount: 0,
     bestPr: null,
     newExercises: [],
@@ -34,7 +33,7 @@ function baseAgg(overrides: Partial<PeriodAggregates> = {}): PeriodAggregates {
     protocolDone: 0,
     protocolDue: 0,
     weeklyTargetDays: null,
-    sparkTonnage: [],
+    sparkSets: [],
     ...overrides,
   };
 }
@@ -158,7 +157,7 @@ describe("dürüstlük garantileri", () => {
   });
 
   it("previous yoksa volume_trend üretilmez (uydurma kıyas yok)", () => {
-    const { facts } = extractFacts(input({ totalSets: 40, tonnageKg: 10000 }));
+    const { facts } = extractFacts(input({ totalSets: 40 }));
     expect(facts.find((f) => f.type === "volume_trend")).toBeUndefined();
   });
 
@@ -185,16 +184,14 @@ describe("pozitif fact üretimi", () => {
     expect(f5.score).toBeGreaterThan(f1.score);
   });
 
-  it("volume_trend: önceki döneme +%10 üstü artış övgü", () => {
+  it("volume_trend: önceki döneme +%10 üstü SET artışı övgü", () => {
     const { facts } = extractFacts(
-      input(
-        { totalSets: 44, tonnageKg: 11000 },
-        { previous: { totalSets: 40, tonnageKg: 9500 } },
-      ),
+      input({ totalSets: 46 }, { previous: { totalSets: 40 } }),
     );
     const f = facts.find((f) => f.type === "volume_trend");
     expect(f).toBeDefined();
-    expect(f?.slots.percent).toBe(16); // 11000/9500 → %15.8 → yuvarlanır
+    expect(f?.slots.percent).toBe(15); // 46/40 → %15
+    expect(f?.slots.sets).toBe(46);
   });
 
   it("uyku iyileşmesi previous'a göre; eşik altı üretilmez", () => {
@@ -240,7 +237,7 @@ describe("pozitif fact üretimi", () => {
     const { facts } = extractFacts(
       input({
         newExercises: ["Bulgarian Split Squat"],
-        bestSession: { date: "2026-07-02", sets: 24, tonnageKg: 9200 },
+        bestSession: { date: "2026-07-02", sets: 24 },
         totalSets: 60,
         sessionsCompleted: 4, // tek seanslı dönemde "en iyi seans" haber değildir
       }),

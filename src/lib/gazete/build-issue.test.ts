@@ -9,7 +9,6 @@ function agg(overrides: Partial<PeriodAggregates> = {}): PeriodAggregates {
     daysInPeriod: 7,
     sessionsCompleted: 0,
     totalSets: 0,
-    tonnageKg: 0,
     prCount: 0,
     bestPr: null,
     newExercises: [],
@@ -28,7 +27,7 @@ function agg(overrides: Partial<PeriodAggregates> = {}): PeriodAggregates {
     protocolDone: 0,
     protocolDue: 0,
     weeklyTargetDays: null,
-    sparkTonnage: [0, 0, 0, 0, 0, 0, 0],
+    sparkSets: [0, 0, 0, 0, 0, 0, 0],
     ...overrides,
   };
 }
@@ -48,11 +47,10 @@ function richInput() {
     current: agg({
       sessionsCompleted: 4,
       totalSets: 62,
-      tonnageKg: 12400,
       prCount: 3,
       bestPr: { exercise: "Bench Press", weight: 105, reps: 5 },
       newExercises: ["Pendlay Row"],
-      bestSession: { date: "2026-07-02", sets: 22, tonnageKg: 5100 },
+      bestSession: { date: "2026-07-02", sets: 22 },
       weightFirst: 71,
       weightLast: 72.2,
       weightSamples: 5,
@@ -67,10 +65,9 @@ function richInput() {
       protocolDone: 13,
       protocolDue: 14,
       weeklyTargetDays: 4,
-      sparkTonnage: [3000, 0, 5100, 0, 4300, 0, 0],
+      sparkSets: [8, 0, 22, 0, 15, 0, 0],
     }),
     previous: agg({
-      tonnageKg: 10000,
       sleepAvg: 7.1,
       totalSets: 50,
       sessionsCompleted: 3,
@@ -93,7 +90,7 @@ describe("buildIssue — boş dönem", () => {
     const payload = buildIssue(ctx, {
       goal: null,
       periodType: "weekly",
-      current: agg({ sessionsCompleted: 1, totalSets: 8, tonnageKg: 1200 }),
+      current: agg({ sessionsCompleted: 1, totalSets: 8 }),
       previous: null,
     });
     expect(payload).not.toBeNull();
@@ -114,7 +111,7 @@ describe("buildIssue — zengin dönem", () => {
   it("lead manşet fact'inin gövdesini ve spark'ı taşır", () => {
     const payload = buildIssue(ctx, richInput())!;
     expect(payload.lead.body.length).toBeGreaterThan(10);
-    expect(payload.lead.spark).toEqual([3000, 0, 5100, 0, 4300, 0, 0]);
+    expect(payload.lead.spark).toEqual([8, 0, 22, 0, 15, 0, 0]);
     expect(payload.lead.stat).not.toBeNull();
   });
 

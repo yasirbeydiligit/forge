@@ -95,7 +95,7 @@ export const HEADLINES: Record<FactType, Template[]> = {
   ],
   best_session: [
     { text: "Haftanın maçı: {sets} setlik gün", slots: ["sets"] },
-    { text: "Bir gün vardı ki: {tonnage} kg kaldırıldı", slots: ["tonnage"] },
+    { text: "Bir gün vardı ki: {sets} set üst üste", slots: ["sets"] },
   ],
 };
 
@@ -143,8 +143,8 @@ export const STORY_BODIES: Record<FactType, Template[]> = {
   ],
   volume_trend: [
     {
-      text: "Toplam {tonnage} kg kaldırıldı — önceki döneme göre %{percent} artış.",
-      slots: ["tonnage", "percent"],
+      text: "Toplam {sets} set işlendi — önceki döneme göre %{percent} artış.",
+      slots: ["sets", "percent"],
     },
     {
       text: "İş hacmi %{percent} büyüdü. Vücut, verilen işe uyum sağlar.",
@@ -213,8 +213,8 @@ export const STORY_BODIES: Record<FactType, Template[]> = {
   ],
   best_session: [
     {
-      text: "Dönemin zirve günü: {sets} set, {tonnage} kg. O günkü sen, referans noktası.",
-      slots: ["sets", "tonnage"],
+      text: "Dönemin zirve günü: {sets} set. O günkü sen, referans noktası.",
+      slots: ["sets"],
     },
     {
       text: "En dolu gün {sets} setle kapandı.",

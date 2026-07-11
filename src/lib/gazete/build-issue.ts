@@ -129,7 +129,7 @@ function storyStat(fact: Fact): { value: string; label: string } | null {
     case "new_exercises":
       return { value: String(fact.slots.count), label: "yeni hareket" };
     case "best_session":
-      return { value: `${fact.slots.tonnage} kg`, label: "zirve gün" };
+      return { value: `${fact.slots.sets} set`, label: "zirve gün" };
   }
 }
 
@@ -157,13 +157,6 @@ function buildStatTable(
       label: "Toplam set",
       value: String(cur.totalSets),
       delta: delta(cur.totalSets, prev?.totalSets),
-    });
-  }
-  if (cur.tonnageKg > 0) {
-    rows.push({
-      label: "Tonaj",
-      value: `${formatNumber(Math.round(cur.tonnageKg))} kg`,
-      delta: delta(cur.tonnageKg, prev?.tonnageKg),
     });
   }
   if (cur.prCount > 0) {
@@ -235,7 +228,7 @@ export function buildIssue(
     lead = {
       body,
       stat: leadStat(top),
-      spark: cur.sparkTonnage.some((v) => v > 0) ? cur.sparkTonnage : null,
+      spark: cur.sparkSets.some((v) => v > 0) ? cur.sparkSets : null,
     };
     storyFacts = positives.slice(1, 1 + MAX_STORIES);
   } else {
@@ -246,7 +239,7 @@ export function buildIssue(
     lead = {
       body: "Bu dönemin kayıtları aşağıda — yorum yok, rakamlar sade.",
       stat: null,
-      spark: cur.sparkTonnage.some((v) => v > 0) ? cur.sparkTonnage : null,
+      spark: cur.sparkSets.some((v) => v > 0) ? cur.sparkSets : null,
     };
     storyFacts = [];
   }

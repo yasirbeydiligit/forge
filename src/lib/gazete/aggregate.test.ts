@@ -21,7 +21,7 @@ function emptyRows(): AggregateRows {
 }
 
 describe("aggregatePeriod — antrenman", () => {
-  it("set/seans/tonaj sayar; weight'i null set tonaja girmez ama set sayısına girer", () => {
+  it("set/seans sayar (hacim = set sayısı; tonaj üründen bilinçli çıkarıldı)", () => {
     const rows = emptyRows();
     rows.sessions = [
       { id: "s1", date: "2026-06-29", completed: true },
@@ -35,10 +35,9 @@ describe("aggregatePeriod — antrenman", () => {
     const agg = aggregatePeriod(WEEK, rows);
     expect(agg.sessionsCompleted).toBe(2);
     expect(agg.totalSets).toBe(3);
-    expect(agg.tonnageKg).toBe(100 * 5 + 120 * 3);
   });
 
-  it("bestSession tonaja göre; spark 7 günlük bucket, boş günler 0", () => {
+  it("bestSession set sayısına göre; spark 7 günlük set bucket'ı, boş günler 0", () => {
     const rows = emptyRows();
     rows.sessions = [
       { id: "s1", date: "2026-06-29", completed: true },
@@ -47,10 +46,11 @@ describe("aggregatePeriod — antrenman", () => {
     rows.sets = [
       { sessionId: "s1", exerciseId: "e1", exerciseName: "Bench", date: "2026-06-29", weight: 100, reps: 5, rir: null },
       { sessionId: "s2", exerciseId: "e2", exerciseName: "Squat", date: "2026-07-04", weight: 150, reps: 5, rir: null },
+      { sessionId: "s2", exerciseId: "e2", exerciseName: "Squat", date: "2026-07-04", weight: 150, reps: 3, rir: null },
     ];
     const agg = aggregatePeriod(WEEK, rows);
-    expect(agg.bestSession).toEqual({ date: "2026-07-04", sets: 1, tonnageKg: 750 });
-    expect(agg.sparkTonnage).toEqual([500, 0, 0, 0, 0, 750, 0]);
+    expect(agg.bestSession).toEqual({ date: "2026-07-04", sets: 2 });
+    expect(agg.sparkSets).toEqual([1, 0, 0, 0, 0, 2, 0]);
   });
 
   it("yeni hareketler: history'de olmayanlar, ilk görülme sırasıyla, tekrarsız", () => {
@@ -157,9 +157,9 @@ describe("aggregatePeriod — spark bucket tipleri", () => {
     ];
     const agg = aggregatePeriod(period, rows);
     // Haziran 2026: 1 Haz Pzt → 5 tam ISO haftası (1, 8, 15, 22, 29 Haz)
-    expect(agg.sparkTonnage).toHaveLength(5);
-    expect(agg.sparkTonnage[0]).toBe(500);
-    expect(agg.sparkTonnage[4]).toBe(500);
+    expect(agg.sparkSets).toHaveLength(5);
+    expect(agg.sparkSets[0]).toBe(1);
+    expect(agg.sparkSets[4]).toBe(1);
   });
 
   it("milestone: ay bucket'ları", () => {
@@ -171,7 +171,7 @@ describe("aggregatePeriod — spark bucket tipleri", () => {
     ];
     const agg = aggregatePeriod(period, rows);
     // Oca, Şub, Mar, Nis → 4 bucket
-    expect(agg.sparkTonnage).toEqual([500, 0, 0, 600]);
+    expect(agg.sparkSets).toEqual([1, 0, 0, 1]);
   });
 
   it("daysInPeriod hesaplanır", () => {

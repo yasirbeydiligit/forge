@@ -172,14 +172,14 @@ export function extractFacts(input: {
     }
   }
 
-  // ---- Volume trend (only with a real previous period) ----
-  if (prev && prev.tonnageKg > 0 && cur.tonnageKg / prev.tonnageKg >= VOLUME_TREND_MIN_RATIO) {
-    const percent = Math.round((cur.tonnageKg / prev.tonnageKg - 1) * 100);
+  // ---- Volume trend (set count, per app-wide decision; needs a real previous) ----
+  if (prev && prev.totalSets > 0 && cur.totalSets / prev.totalSets >= VOLUME_TREND_MIN_RATIO) {
+    const percent = Math.round((cur.totalSets / prev.totalSets - 1) * 100);
     facts.push({
       type: "volume_trend",
       score: SCORE.volume_trend + Math.min(percent, 50) / 2,
       direction: "positive",
-      slots: { percent, tonnage: Math.round(cur.tonnageKg) },
+      slots: { percent, sets: cur.totalSets },
     });
   }
 
@@ -273,16 +273,12 @@ export function extractFacts(input: {
   }
 
   // ---- Best session ----
-  if (cur.bestSession && cur.bestSession.tonnageKg > 0 && cur.sessionsCompleted > 1) {
+  if (cur.bestSession && cur.bestSession.sets > 0 && cur.sessionsCompleted > 1) {
     facts.push({
       type: "best_session",
       score: SCORE.best_session,
       direction: "positive",
-      slots: {
-        date: cur.bestSession.date,
-        sets: cur.bestSession.sets,
-        tonnage: Math.round(cur.bestSession.tonnageKg),
-      },
+      slots: { date: cur.bestSession.date, sets: cur.bestSession.sets },
     });
   }
 

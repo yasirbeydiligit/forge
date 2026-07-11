@@ -59,11 +59,10 @@ export type PeriodAggregates = {
   daysInPeriod: number;
   sessionsCompleted: number;
   totalSets: number;
-  tonnageKg: number;
   prCount: number;
   bestPr: { exercise: string; weight: number; reps: number } | null;
   newExercises: string[];
-  bestSession: { date: string; sets: number; tonnageKg: number } | null;
+  bestSession: { date: string; sets: number } | null;
   /** Mean of the first/last up-to-3 weigh-ins — noise-trimmed trend anchors. */
   weightFirst: number | null;
   weightLast: number | null;
@@ -79,8 +78,9 @@ export type PeriodAggregates = {
   protocolDone: number;
   protocolDue: number;
   weeklyTargetDays: number | null;
-  /** Lead sparkline: weekly→daily, monthly→ISO-week, milestone→month tonnage. */
-  sparkTonnage: number[];
+  /** Lead sparkline: weekly→daily, monthly→ISO-week, milestone→month SET counts
+   *  (volume is set count app-wide; tonnage was deliberately removed). */
+  sparkSets: number[];
 };
 
 function mean(values: number[]): number | null {
@@ -109,9 +109,8 @@ function sparkBuckets(period: Period, sets: AggregateRows["sets"]): number[] {
 
   const buckets = new Array<number>(Math.max(count, 1)).fill(0);
   for (const s of sets) {
-    if (s.weight == null || s.reps == null) continue;
     const i = indexOf(s.date);
-    if (i >= 0 && i < buckets.length) buckets[i] += s.weight * s.reps;
+    if (i >= 0 && i < buckets.length) buckets[i] += 1;
   }
   return buckets;
 }
@@ -120,26 +119,16 @@ export function aggregatePeriod(
   period: Period,
   rows: AggregateRows,
 ): PeriodAggregates {
-  // ---- Training ----
-  let tonnageKg = 0;
-  const bySession = new Map<string, { date: string; sets: number; tonnageKg: number }>();
+  // ---- Training (volume is set count, per the app-wide product decision) ----
+  const bySession = new Map<string, { date: string; sets: number }>();
   for (const s of rows.sets) {
-    const t = s.weight != null && s.reps != null ? s.weight * s.reps : 0;
-    tonnageKg += t;
-    const entry = bySession.get(s.sessionId) ?? { date: s.date, sets: 0, tonnageKg: 0 };
+    const entry = bySession.get(s.sessionId) ?? { date: s.date, sets: 0 };
     entry.sets += 1;
-    entry.tonnageKg += t;
     bySession.set(s.sessionId, entry);
   }
   let bestSession: PeriodAggregates["bestSession"] = null;
   for (const entry of bySession.values()) {
-    if (
-      !bestSession ||
-      entry.tonnageKg > bestSession.tonnageKg ||
-      (entry.tonnageKg === bestSession.tonnageKg && entry.sets > bestSession.sets)
-    ) {
-      bestSession = entry;
-    }
+    if (!bestSession || entry.sets > bestSession.sets) bestSession = entry;
   }
 
   const newExercises: string[] = [];
@@ -210,7 +199,6 @@ export function aggregatePeriod(
       differenceInCalendarDays(parseDateKey(period.end), parseDateKey(period.start)) + 1,
     sessionsCompleted: rows.sessions.filter((s) => s.completed).length,
     totalSets: rows.sets.length,
-    tonnageKg,
     prCount,
     bestPr,
     newExercises,
@@ -229,6 +217,6 @@ export function aggregatePeriod(
     protocolDone: rows.protocol.done,
     protocolDue: rows.protocol.due,
     weeklyTargetDays: rows.weeklyTargetDays,
-    sparkTonnage: sparkBuckets(period, rows.sets),
+    sparkSets: sparkBuckets(period, rows.sets),
   };
 }
