@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireProfile } from "@/lib/auth";
+import { computeExerciseStats } from "@/lib/logbook-stats";
 import type { SessionReport } from "@/lib/reports/session-report";
+import type { SubstituteStats } from "@/lib/session/types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ensureSession } from "../../session-helpers";
 import { loadSessionReport } from "./report-loader";
@@ -169,6 +171,77 @@ export async function getSessionReportAction(
   const report = await loadSessionReport(supabase, profile.id, date.data, assignmentId.data);
   if (!report) return { error: "no_report" };
   return { report };
+}
+
+/**
+ * History for a muadil (substitute) exercise picked mid-session: the last-
+ * session strip values plus the PR frontier the live PR check needs. RLS scopes
+ * the log_sets query to the athlete's own visible rows.
+ */
+export async function getSubstituteStatsAction(
+  raw: { exerciseId: string; date: string },
+): Promise<{ stats: SubstituteStats } | { error: string }> {
+  await requireProfile();
+  const exerciseId = z.string().uuid().safeParse(raw.exerciseId);
+  const date = z.string().regex(dateRe).safeParse(raw.date);
+  if (!exerciseId.success || !date.success) return { error: "invalid" };
+
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase
+    .from("log_sets")
+    .select(
+      "weight, reps, rir, set_number, exercise_id, created_at, session:log_sessions(session_date)",
+    )
+    .eq("exercise_id", exerciseId.data);
+
+  const rows = ((data ?? []) as unknown as {
+    weight: number | null;
+    reps: number | null;
+    rir: number | null;
+    set_number: number;
+    exercise_id: string;
+    created_at: string;
+    session: { session_date: string } | null;
+  }[])
+    .filter((r) => r.session)
+    .map((r) => ({ ...r, session_date: r.session!.session_date }));
+
+  const stats = computeExerciseStats(rows, date.data);
+  return {
+    stats: {
+      allTimePr: stats.allTimePr,
+      prevSessionWeights: stats.prevSessionWeights,
+      prevSessionSets: stats.prevSessionSets,
+      prHistory: stats.prHistory,
+    },
+  };
+}
+
+export type PickerExercise = {
+  id: string;
+  name: string;
+  category: string | null;
+  region: string | null;
+};
+
+/**
+ * The exercise library for the mid-session "hareket ekle" picker, browsed by
+ * muscle group (category) + sub-region. RLS returns exactly system exercises +
+ * the athlete's own; filtering/grouping happens client-side via lib/exercises/filter.
+ */
+export async function listExercisesForPickerAction(): Promise<
+  { exercises: PickerExercise[] } | { error: string }
+> {
+  await requireProfile();
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("exercises")
+    .select("id, name, category, region")
+    .order("category", { ascending: true, nullsFirst: false })
+    .order("region", { ascending: true, nullsFirst: false })
+    .order("name", { ascending: true });
+  if (error || !data) return { error: "load_failed" };
+  return { exercises: data };
 }
 
 export async function shareToFeedAction(

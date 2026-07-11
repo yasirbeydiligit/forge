@@ -10,7 +10,8 @@ export type LogSetPayload = {
   assignmentId: string;
   workoutId: string;
   exerciseId: string;
-  workoutExerciseId: string;
+  /** null for exercises added mid-session (no program row to reference). */
+  workoutExerciseId: string | null;
   setNumber: number;
   weight: number | null;
   reps: number | null;

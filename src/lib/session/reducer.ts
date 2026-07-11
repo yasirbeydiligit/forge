@@ -1,4 +1,10 @@
-import type { ExerciseState, SessionState, SetEntry } from "./types";
+import type {
+  ExerciseState,
+  ExerciseTarget,
+  SessionState,
+  SetEntry,
+  SubstituteStats,
+} from "./types";
 import { SESSION_STATE_VERSION } from "./types";
 
 export type ServerSet = {
@@ -23,8 +29,28 @@ export type InitInput = {
   }[];
 };
 
+export type SubstituteInput = {
+  exerciseId: string;
+  name: string;
+  category: string | null;
+  stats: SubstituteStats;
+};
+
+export type AddedExerciseInput = {
+  /** Client-generated stable key; becomes workoutExerciseId locally, never sent to the server. */
+  localKey: string;
+  exerciseId: string;
+  name: string;
+  category: string | null;
+  target: ExerciseTarget;
+  stats: SubstituteStats;
+};
+
 export type SessionAction =
   | { type: "START"; sessionId: string; startedAt: number }
+  | { type: "SUBSTITUTE_EXERCISE"; exerciseIndex: number; substitute: SubstituteInput }
+  | { type: "ADD_EXERCISE"; exercise: AddedExerciseInput }
+  | { type: "REMOVE_EXERCISE"; exerciseIndex: number }
   | { type: "COMPLETE_SET"; exerciseIndex: number; set: SetEntry }
   | { type: "RECONCILE_SET"; localId: string; serverId: string }
   | { type: "DELETE_SET"; localId: string }
@@ -106,6 +132,59 @@ export function sessionReducer(state: SessionState, action: SessionAction): Sess
     case "START":
       return { ...state, sessionId: action.sessionId, startedAt: action.startedAt };
 
+    case "SUBSTITUTE_EXERCISE":
+      return {
+        ...state,
+        exercises: updateExercise(state.exercises, action.exerciseIndex, (e) => {
+          const originalExerciseId = e.substitute?.originalExerciseId ?? e.exerciseId;
+          // Swapping back to the program's exercise cancels the substitution.
+          if (action.substitute.exerciseId === originalExerciseId) {
+            return { ...e, exerciseId: originalExerciseId, substitute: null };
+          }
+          return {
+            ...e,
+            exerciseId: action.substitute.exerciseId,
+            substitute: {
+              originalExerciseId,
+              name: action.substitute.name,
+              category: action.substitute.category,
+              stats: action.substitute.stats,
+            },
+          };
+        }),
+      };
+
+    case "ADD_EXERCISE":
+      return {
+        ...state,
+        exercises: [
+          ...state.exercises,
+          {
+            workoutExerciseId: action.exercise.localKey,
+            exerciseId: action.exercise.exerciseId,
+            sets: [],
+            added: {
+              name: action.exercise.name,
+              category: action.exercise.category,
+              target: action.exercise.target,
+              stats: action.exercise.stats,
+            },
+          },
+        ],
+      };
+
+    case "REMOVE_EXERCISE": {
+      const target = state.exercises[action.exerciseIndex];
+      // Only session-added exercises with nothing logged can be removed.
+      if (!target?.added || target.sets.length > 0) return state;
+      const exercises = state.exercises.filter((_, i) => i !== action.exerciseIndex);
+      const active =
+        action.exerciseIndex < state.activeExerciseIndex
+          ? state.activeExerciseIndex - 1
+          : state.activeExerciseIndex;
+      return { ...state, exercises, activeExerciseIndex: clampIndex(active, exercises.length) };
+    }
+
     case "COMPLETE_SET":
       return {
         ...state,
@@ -184,16 +263,26 @@ export function hydrate(input: {
     const sets = [...srvEx.sets, ...pending].sort(
       (a, b) => a.completedAt - b.completedAt,
     );
+    // A session-scoped muadil swap only exists locally — carry it over so the
+    // substitute (and its stats for the strip / PR check) survives a refresh.
+    if (local.substitute) {
+      return { ...srvEx, sets, exerciseId: local.exerciseId, substitute: local.substitute };
+    }
     return { ...srvEx, sets };
   });
 
+  // Session-added exercises exist only locally: the server-built state has no
+  // row for them, so carry them over whole — including already-synced sets.
+  const addedExercises = persisted.exercises.filter((e) => e.added);
+  const all = [...exercises, ...addedExercises];
+
   return {
     ...server,
-    exercises,
+    exercises: all,
     sessionId: persisted.sessionId ?? server.sessionId,
     startedAt: persisted.startedAt ?? server.startedAt,
     finishedAt: persisted.finishedAt,
-    activeExerciseIndex: clampIndex(persisted.activeExerciseIndex, exercises.length),
+    activeExerciseIndex: clampIndex(persisted.activeExerciseIndex, all.length),
     rest: persisted.rest,
   };
 }

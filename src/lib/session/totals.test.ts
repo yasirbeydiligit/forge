@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { detectPr, sessionTotals } from "./totals";
+import { detectPr, detectPrResult, sessionTotals } from "./totals";
 import type { ExerciseState, SetEntry } from "./types";
 
 function set(overrides: Partial<SetEntry> = {}): SetEntry {
@@ -48,6 +48,37 @@ describe("detectPr (evaluatePR wrapper)", () => {
     expect(
       detectPr([{ weight: 100, reps: 5, rir: 3 }], { weight: 100, reps: 5, rir: 1 }),
     ).toBe(true);
+  });
+});
+
+describe("detectPrResult", () => {
+  it("exposes the PR type for celebration copy (weight PR)", () => {
+    const r = detectPrResult([{ weight: 100, reps: 5, rir: null }], {
+      weight: 102.5,
+      reps: 5,
+      rir: null,
+    });
+    expect(r.isPR).toBe(true);
+    expect(r.type).toBe("weight");
+  });
+
+  it("labels a RIR PR distinctly from strength PRs", () => {
+    const r = detectPrResult([{ weight: 100, reps: 5, rir: 3 }], {
+      weight: 100,
+      reps: 5,
+      rir: 1,
+    });
+    expect(r.isPR).toBe(true);
+    expect(r.type).toBe("rir");
+  });
+
+  it("returns a null type when not a PR", () => {
+    const r = detectPrResult([{ weight: 100, reps: 5, rir: null }], {
+      weight: 90,
+      reps: 5,
+      rir: null,
+    });
+    expect(r).toMatchObject({ isPR: false, type: null });
   });
 });
 

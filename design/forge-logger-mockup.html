@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Forge — Workout Logger Mobil Tasarım Referansı</title>
+<!--
+  FORGE WORKOUT LOGGER — ONAYLANMIŞ MOBİL TASARIM REFERANSI
+  Bu dosya spesifikasyondur: renkler, boşluklar, hiyerarşi ve akış buradaki gibi uygulanmalı.
+  Uygulamadaki karşılıklar: serif = mevcut display fontu, mono = mevcut mono font,
+  ikonlar = Lucide eşdeğerleri (x, history, check, trophy, skip-forward, shuffle).
+  Onaylanmış kararlar:
+  - Girişler hedef/geçen seans değeriyle ÖNCEDEN DOLU gelir (sıfır-dokunuş hedefi).
+  - KG adımı HER ekipmanda ±2,5. Sayıya dokununca klavyeyle serbest giriş.
+  - RIR opsiyonel, tek dokunuş çipleri: 0 / 1 / 2 / 3 / 4+.
+  - Geçen-seans şeridi KATLANABİLİR (varsayılan açık, dokununca daralır).
+  - Rest timer ayrı ekran değil, alt katman (bottom sheet). PR kutlaması sheet içinde.
+  - "Antrenmanı bitir" amber + onay diyaloğu (yıkıcı aksiyon).
+  - Küçük ekran feda sırası: 1) geçen-seans şeridi katlanır 2) set hapları küçülür 3) stepper'lar ASLA küçülmez.
+  - Tüm birincil aksiyonlar ekranın alt yarısında (başparmak bölgesi).
+-->
+<style>
+  :root{
+    --paper:#f5f1e8; --card:#fbf8f1; --sunken:#efe9db;
+    --ink:#26221a; --ink-2:#4a4438; --ink-3:#6b6355; --ink-4:#8a8272; --ink-5:#a49b87;
+    --line:#e2dbc9; --line-2:#d8d0bc;
+    --green:#2f5e3f; --green-bg:#e6efe6; --green-line:#bcd2bc;
+    --amber:#b98a4a; --amber-bg:#f5ecd9; --amber-ink:#7a5a2a;
+    --serif:Georgia,'Times New Roman',serif;
+    --mono:ui-monospace,'SF Mono',Menlo,monospace;
+    --sans:-apple-system,'Segoe UI',sans-serif;
+  }
+  body{background:#e9e4d8;font-family:var(--sans);color:var(--ink);display:flex;gap:32px;flex-wrap:wrap;justify-content:center;padding:32px;}
+  .phone{width:360px;background:var(--paper);border:1px solid var(--line-2);border-radius:28px;padding:18px;flex-shrink:0;}
+  .phone.noPad{padding:0;overflow:hidden;}
+  .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+  .label{font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:var(--ink-4);}
+  .timer{font-family:var(--mono);font-size:13px;color:var(--green);}
+  .progress{display:flex;gap:4px;margin-bottom:18px;}
+  .progress span{flex:1;height:3px;border-radius:2px;background:var(--line-2);}
+  .progress span.done{background:var(--green);}
+  h1{font-family:var(--serif);font-size:28px;line-height:1.15;margin:4px 0 2px;font-weight:400;}
+  .meta{font-size:13px;color:var(--ink-3);margin:0 0 10px;}
+  .history{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--sunken);border-radius:8px;margin-bottom:16px;font-family:var(--mono);font-size:12px;color:var(--ink-2);cursor:pointer;}
+  .pills{display:flex;gap:8px;margin-bottom:18px;}
+  .pill{flex:1;text-align:center;padding:8px 4px;border-radius:10px;background:var(--card);border:1px solid var(--line-2);font-family:var(--mono);font-size:11px;color:var(--ink-5);}
+  .pill.done{background:var(--green-bg);border-color:var(--green-line);color:var(--green);}
+  .pill.active{border:2px solid var(--green);color:var(--ink);font-weight:600;}
+  .stepper{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:10px;}
+  .stepper .lbl{margin:0 0 6px;font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:var(--ink-4);text-align:center;}
+  .stepper .row{display:flex;align-items:center;justify-content:space-between;}
+  .stepper button{width:56px;height:56px;border-radius:12px;border:1px solid var(--line-2);background:var(--paper);font-size:20px;color:var(--ink-2);}
+  .stepper .val{font-family:var(--mono);font-size:40px;}
+  .stepper .val small{font-size:18px;color:var(--ink-5);}
+  .stepper .hint{margin:6px 0 0;font-size:11px;color:var(--ink-5);text-align:center;}
+  .rir{display:flex;align-items:center;gap:6px;margin-bottom:16px;}
+  .rir .chips{flex:1;display:flex;gap:6px;}
+  .rir .chip{flex:1;text-align:center;padding:9px 0;border-radius:8px;border:1px solid var(--line-2);background:var(--card);font-family:var(--mono);font-size:13px;color:var(--ink-3);}
+  .rir .chip.on{border-color:var(--green);background:var(--green-bg);color:var(--green);font-weight:600;}
+  .cta{width:100%;padding:16px 0;border-radius:14px;border:none;background:var(--green);color:var(--paper);font-size:16px;font-weight:500;}
+  .note{margin:10px 0 0;text-align:center;font-size:12px;color:var(--ink-5);}
+  .dim{opacity:.45;padding:18px 18px 8px;}
+  .sheet{background:var(--card);border-top:1px solid var(--line-2);border-radius:22px 22px 0 0;padding:16px 18px 18px;margin-top:4px;}
+  .grab{width:40px;height:4px;border-radius:2px;background:var(--line-2);margin:0 auto 14px;}
+  .prbadge{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:999px;background:var(--green);color:var(--paper);font-family:var(--mono);font-size:12px;}
+  .center{display:flex;justify-content:center;margin-bottom:12px;}
+  .prtext{margin:0 0 14px;text-align:center;font-size:12px;color:var(--ink-3);}
+  .count{margin:0 0 10px;text-align:center;font-family:var(--mono);font-size:52px;line-height:1;}
+  .bar{height:6px;border-radius:3px;background:var(--line);margin-bottom:16px;overflow:hidden;}
+  .bar div{width:74%;height:100%;background:var(--green);border-radius:3px;}
+  .duo{display:flex;gap:8px;margin-bottom:14px;}
+  .duo button{flex:1;padding:12px 0;border-radius:12px;border:1px solid var(--line-2);background:var(--paper);font-size:14px;color:var(--ink-2);}
+  .next{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:10px;background:var(--sunken);font-size:12px;color:var(--ink-3);}
+  .next b{font-family:var(--mono);font-size:12px;color:var(--ink);font-weight:400;}
+  .exrow{display:flex;align-items:center;gap:10px;padding:12px;border-radius:12px;background:var(--card);border:1px solid var(--line);margin-bottom:8px;}
+  .exrow.active{border:2px solid var(--green);}
+  .exrow .dot{width:8px;height:8px;border-radius:50%;background:var(--line-2);flex-shrink:0;}
+  .exrow.active .dot{background:var(--green);}
+  .exrow .nm{margin:0;font-size:14px;}
+  .exrow .sub{margin:0;font-family:var(--mono);font-size:11px;color:var(--ink-5);}
+  .exrow .tag{font-size:11px;color:var(--ink-3);border:1px solid var(--line-2);border-radius:999px;padding:4px 10px;white-space:nowrap;}
+  .finish{width:100%;padding:13px 0;border-radius:12px;border:1px solid var(--amber);background:var(--amber-bg);color:var(--amber-ink);font-size:14px;}
+</style>
+</head>
+<body>
+
+<!-- EKRAN 1: AKTİF SET GİRİŞİ -->
+<div class="phone">
+  <div class="topbar"><span style="color:var(--ink-4)">✕</span><span class="label">GÜN B — ÇEKİŞ</span><span class="timer">45:32</span></div>
+  <div class="progress"><span class="done"></span><span class="done"></span><span></span><span></span></div>
+  <p class="label">EGZERSİZ 2/4</p>
+  <h1>Deadlift</h1>
+  <p class="meta">Sırt · hedef 3 × 5 @ 100 kg · 3 dk dinlenme</p>
+  <div class="history">⟲ Geçen: 3×5 @ 110 · PR 110 kg <span style="margin-left:auto;color:var(--ink-5)">▾</span></div>
+  <div class="pills">
+    <div class="pill done">✓ 110×5</div>
+    <div class="pill active">SET 2</div>
+    <div class="pill">SET 3</div>
+  </div>
+  <div class="stepper">
+    <p class="lbl">KG</p>
+    <div class="row"><button>−</button><span class="val">110<small>.0</small></span><button>+</button></div>
+    <p class="hint">±2,5 · sayıya dokunup yazabilirsin</p>
+  </div>
+  <div class="stepper">
+    <p class="lbl">TEKRAR</p>
+    <div class="row"><button>−</button><span class="val">5</span><button>+</button></div>
+  </div>
+  <div class="rir">
+    <span class="label" style="margin-right:2px">RIR</span>
+    <div class="chips"><span class="chip">0</span><span class="chip">1</span><span class="chip on">2</span><span class="chip">3</span><span class="chip">4+</span></div>
+  </div>
+  <button class="cta">✓ Seti tamamla</button>
+  <p class="note">+ not ekle</p>
+</div>
+
+<!-- EKRAN 2: REST TIMER ALT KATMANI + PR ANI -->
+<div class="phone noPad">
+  <div class="dim">
+    <div class="topbar"><span style="color:var(--ink-4)">✕</span><span class="label">GÜN B — ÇEKİŞ</span><span class="timer">47:05</span></div>
+    <p class="label">EGZERSİZ 2/4</p>
+    <h1>Deadlift</h1>
+    <div class="pills" style="margin-top:10px">
+      <div class="pill done">✓ 110×5</div>
+      <div class="pill done">✓ 112.5×5</div>
+      <div class="pill active">SET 3</div>
+    </div>
+  </div>
+  <div class="sheet">
+    <div class="grab"></div>
+    <div class="center"><span class="prbadge">🏆 PR — 112.5 kg × 5</span></div>
+    <p class="prtext">Aynı tekrarda daha fazla kilo. Güçleniyorsun.</p>
+    <p class="label" style="text-align:center;margin:0 0 4px">DİNLENME</p>
+    <p class="count">2:14</p>
+    <div class="bar"><div></div></div>
+    <div class="duo"><button>+30 sn</button><button>Atla ⏭</button></div>
+    <div class="next"><span>Sıradaki</span><b>SET 3 · hedef 5 @ 112.5 kg</b></div>
+  </div>
+</div>
+
+<!-- EKRAN 3: EGZERSİZ GEÇİŞ / GENEL BAKIŞ KATMANI -->
+<div class="phone">
+  <div class="topbar" style="margin-bottom:4px">
+    <span style="font-family:var(--serif);font-size:22px">Gün B — Çekiş</span><span class="timer">47:05</span>
+  </div>
+  <p style="margin:0 0 16px;font-size:12px;color:var(--ink-4)">2/4 egzersiz · 5/12 set tamamlandı</p>
+  <div class="exrow">
+    <span style="color:var(--green)">✓</span>
+    <div style="flex:1"><p class="nm" style="color:var(--ink-3);text-decoration:line-through">Barbell Row</p><p class="sub">4 set · 80–85 kg</p></div>
+  </div>
+  <div class="exrow active">
+    <span class="dot"></span>
+    <div style="flex:1"><p class="nm" style="font-weight:600">Deadlift</p><p class="sub" style="color:var(--ink-3)">2/3 set · sıradaki: 5 @ 112.5</p></div>
+    <span class="label" style="color:var(--green);font-size:10px">DEVAM ET</span>
+  </div>
+  <div class="exrow">
+    <span class="dot"></span>
+    <div style="flex:1"><p class="nm">Lat Pulldown</p><p class="sub">3 × 10–12 · 1 dk 30 sn</p></div>
+    <span class="tag">⇄ muadil</span>
+  </div>
+  <div class="exrow" style="margin-bottom:14px">
+    <span class="dot"></span>
+    <div style="flex:1"><p class="nm">Dumbbell Curl</p><p class="sub">3 × 10–12 · 1 dk</p></div>
+    <span class="tag">⇄ muadil</span>
+  </div>
+  <button class="finish">Antrenmanı bitir</button>
+</div>
+
+</body>
+</html>

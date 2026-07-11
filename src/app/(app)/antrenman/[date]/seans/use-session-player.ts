@@ -2,12 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import type { PRResult } from "@/lib/pr/evaluate-pr";
 import {
   createInitialState,
   hydrate,
   sessionReducer,
+  type AddedExerciseInput,
   type InitInput,
   type SessionAction,
+  type SubstituteInput,
 } from "@/lib/session/reducer";
 import {
   loadQueue,
@@ -17,7 +20,7 @@ import {
   saveState,
   sessionKey,
 } from "@/lib/session/storage";
-import { detectPr } from "@/lib/session/totals";
+import { detectPrResult } from "@/lib/session/totals";
 import { queueReducer, type QueueEvent, type QueueOp } from "@/lib/session/sync-queue";
 import type { SessionState } from "@/lib/session/types";
 
@@ -236,17 +239,24 @@ export function useSessionPlayer(data: PlayerData) {
   }, [dispatch, data.date, data.assignmentId, data.workoutId]);
 
   const completeSet = useCallback(
-    (exerciseIndex: number, input: SetInput): boolean => {
+    (exerciseIndex: number, input: SetInput): PRResult => {
       const ex = stateRef.current.exercises[exerciseIndex];
       const meta = data.exercises[exerciseIndex];
-      if (!ex || !meta) return false;
+      if (!ex || (!meta && !ex.added)) return { isPR: false, type: null, reference: null };
       // History = the exercise's all-time PR frontier plus the sets already done
       // this session, so progressive sets within one workout can also be PRs.
+      // Muadil swaps and session-added exercises bring their own frontier (the
+      // program exercise's history would be the wrong exercise to beat).
+      const baseHistory = ex.added
+        ? ex.added.stats.prHistory
+        : ex.substitute
+          ? ex.substitute.stats.prHistory
+          : meta!.stats.prHistory;
       const history = [
-        ...meta.stats.prHistory,
+        ...baseHistory,
         ...ex.sets.map((s) => ({ weight: s.weight, reps: s.reps, rir: s.rir })),
       ];
-      const pr = detectPr(history, {
+      const pr = detectPrResult(history, {
         weight: input.weight,
         reps: input.reps,
         rir: input.rir,
@@ -272,7 +282,8 @@ export function useSessionPlayer(data: PlayerData) {
           rir: input.rir,
           note: input.note,
           completedAt,
-          pr,
+          pr: pr.isPR,
+          prType: pr.type,
         },
       });
       enqueue({
@@ -283,7 +294,8 @@ export function useSessionPlayer(data: PlayerData) {
           assignmentId: data.assignmentId,
           workoutId: data.workoutId,
           exerciseId: ex.exerciseId,
-          workoutExerciseId: ex.workoutExerciseId,
+          // Added exercises have no program row; the server accepts null.
+          workoutExerciseId: ex.added ? null : ex.workoutExerciseId,
           setNumber: ex.sets.length + 1,
           weight: input.weight,
           reps: input.reps,
@@ -315,6 +327,25 @@ export function useSessionPlayer(data: PlayerData) {
 
   const setActiveExercise = useCallback(
     (index: number) => dispatch({ type: "SET_ACTIVE_EXERCISE", index }),
+    [dispatch],
+  );
+
+  /** Session-scoped muadil swap; the program template is never mutated. */
+  const substituteExercise = useCallback(
+    (exerciseIndex: number, substitute: SubstituteInput) =>
+      dispatch({ type: "SUBSTITUTE_EXERCISE", exerciseIndex, substitute }),
+    [dispatch],
+  );
+
+  /** Session-scoped extra exercise; appended after the program's list. */
+  const addExercise = useCallback(
+    (exercise: AddedExerciseInput) => dispatch({ type: "ADD_EXERCISE", exercise }),
+    [dispatch],
+  );
+
+  /** Remove a session-added exercise (reducer refuses once sets are logged). */
+  const removeExercise = useCallback(
+    (exerciseIndex: number) => dispatch({ type: "REMOVE_EXERCISE", exerciseIndex }),
     [dispatch],
   );
 
@@ -376,6 +407,9 @@ export function useSessionPlayer(data: PlayerData) {
     completeSet,
     deleteSet,
     setActiveExercise,
+    substituteExercise,
+    addExercise,
+    removeExercise,
     startRest,
     extendRest,
     clearRest,
