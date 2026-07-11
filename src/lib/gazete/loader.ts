@@ -16,7 +16,7 @@ import { parseDateKey, toDateKey } from "@/lib/format";
 import { aggregatePeriod, type AggregateRows, type PeriodAggregates } from "./aggregate";
 import { buildIssue, type IssuePayload } from "./build-issue";
 import type { TrainingGoal } from "./facts";
-import { duePeriods, nextMilestone, periodKey, type Period } from "./periods";
+import { duePeriods, nextMilestone, type Period } from "./periods";
 
 type Client = SupabaseClient<Database>;
 
