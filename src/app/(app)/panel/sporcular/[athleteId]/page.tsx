@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Dumbbell,
   FlaskConical,
+  Newspaper,
   NotebookPen,
 } from "lucide-react";
 
@@ -197,6 +198,12 @@ export default async function AthleteDetailPage({
           ) : null}
         </div>
         <div className="flex items-center gap-3">
+          <Link
+            href={`/panel/sporcular/${athleteId}/gazete`}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <Newspaper className="size-4" /> Gazete
+          </Link>
           <QuickMessage
             athleteId={athleteId}
             athleteName={athlete.full_name}

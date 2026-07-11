@@ -1,5 +1,6 @@
 import { AppShell } from "@/components/shell/app-shell";
 import { requireProfile } from "@/lib/auth";
+import { loadGazeteSignal } from "@/lib/gazete/signal";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { loadTriage } from "@/lib/triage/load-triage";
 
@@ -12,6 +13,11 @@ export default async function AppLayout({
 
   let unansweredCount = 0;
   let attentionCount = 0;
+  let gazeteCount = 0;
+  if (profile.role === "athlete") {
+    // Request-cached; the Bugün discovery card reuses this computation.
+    gazeteCount = (await loadGazeteSignal(profile.id)).newCount;
+  }
   if (profile.role === "coach") {
     const supabase = await createSupabaseServerClient();
     // loadTriage is request-cached, so the panel page reuses this computation.
@@ -32,6 +38,7 @@ export default async function AppLayout({
       profile={profile}
       unansweredCount={unansweredCount}
       attentionCount={attentionCount}
+      gazeteCount={gazeteCount}
     >
       {children}
     </AppShell>

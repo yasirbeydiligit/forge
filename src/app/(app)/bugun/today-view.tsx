@@ -1,11 +1,13 @@
 import Link from "next/link";
 import {
   Activity,
+  ArrowUpRight,
   Camera,
   ClipboardList,
   Dumbbell,
   Footprints,
   type LucideIcon,
+  Newspaper,
   Play,
   Scale,
   UtensilsCrossed,
@@ -72,6 +74,8 @@ export type TodayViewProps = {
   };
   protocols: ProtocolItem[];
   week: { completed: number; target: number | null; programCount: number };
+  /** Unread/pending Gazete issues — shows the discovery band when > 0. */
+  gazeteNewCount: number;
 };
 
 export function TodayView(props: TodayViewProps) {
@@ -111,6 +115,29 @@ export function TodayView(props: TodayViewProps) {
         <section>
           <WeekStrip cells={weekStripCells} />
         </section>
+
+        {/* 1.5 — Gazete discovery band (mobile has no sidebar; this is the
+            athlete's doorway to a freshly printed issue) */}
+        {props.gazeteNewCount > 0 ? (
+          <section>
+            <Link href="/gazete" className="group block">
+              <PaperCard className="flex items-center gap-3 border-l-4 border-l-lab-amber p-4 transition-shadow hover:shadow-md">
+                <Newspaper className="size-5 shrink-0 text-lab-amber" />
+                <div className="min-w-0 flex-1">
+                  <p className="font-mono text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">
+                    Forge Gazete
+                  </p>
+                  <p className="truncate font-serif text-base text-lab-ink">
+                    {props.gazeteNewCount === 1
+                      ? "Yeni sayın basıldı — manşette sen varsın"
+                      : `${props.gazeteNewCount} yeni sayı seni bekliyor`}
+                  </p>
+                </div>
+                <ArrowUpRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+              </PaperCard>
+            </Link>
+          </section>
+        ) : null}
 
         {/* 2 — Today's workout, smart entry */}
         <section className="space-y-3">

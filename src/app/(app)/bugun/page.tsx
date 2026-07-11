@@ -5,6 +5,7 @@ import { TodayView, type TodayViewProps } from "./today-view";
 import { ProtocolItem } from "@/app/(app)/beslenme/protocol-checklist";
 import { requireProfile } from "@/lib/auth";
 import { cardioWeeklySummary } from "@/lib/cardio";
+import { loadGazeteSignal } from "@/lib/gazete/signal";
 import { formatDate, formatNumber, formatRepRange, toDateKey } from "@/lib/format";
 import { STALE_AFTER_DAYS, daysSince, signPhysiquePaths } from "@/lib/physique";
 import { getAthleteInsights } from "@/lib/rag/insights-server";
@@ -243,10 +244,13 @@ export default async function TodayPage() {
     }));
 
   const insights = await getAthleteInsights(supabase, profile.id, "nutrition");
+  // Request-cached — the app layout's nav badge already computed this.
+  const gazete = await loadGazeteSignal(profile.id);
 
   return (
     <TodayView
       firstName={profile.full_name.split(" ")[0]}
+      gazeteNewCount={gazete.newCount}
       todayKey={todayKey}
       dateLabel={formatDate(todayKey, "EEEE, d MMMM")}
       weekNo={getISOWeek(today)}

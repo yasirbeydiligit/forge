@@ -80,7 +80,7 @@ export default async function IssuePage({
       payload={payload}
       photoUrls={photoUrls}
       athleteName={athleteName}
-      backHref={isOwner ? "/gazete" : undefined}
+      backHref={isOwner ? "/gazete" : `/panel/sporcular/${issue.athlete_id}/gazete`}
     />
   );
 }

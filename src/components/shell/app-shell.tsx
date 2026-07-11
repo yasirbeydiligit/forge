@@ -15,6 +15,7 @@ import {
   LineChart,
   type LucideIcon,
   MessageSquare,
+  Newspaper,
   NotebookPen,
   Send,
   UtensilsCrossed,
@@ -42,6 +43,7 @@ function buildNav(
   profile: Profile,
   unansweredCount: number,
   attentionCount: number,
+  gazeteCount: number,
 ) {
   if (profile.role === "coach") {
     const primary: NavItem[] = [
@@ -87,6 +89,7 @@ function buildNav(
     { href: "/feed", label: "Feed", icon: MessageSquare },
   ];
   const secondary: NavItem[] = [
+    { href: "/gazete", label: "Gazete", icon: Newspaper, badge: gazeteCount },
     { href: "/beslenme", label: "Beslenme", icon: UtensilsCrossed },
     { href: "/fizik", label: "Fizik", icon: Camera },
     { href: "/programlar", label: "Programlar", icon: Dumbbell, exact: true },
@@ -121,14 +124,21 @@ export function AppShell({
   profile,
   unansweredCount,
   attentionCount = 0,
+  gazeteCount = 0,
   children,
 }: {
   profile: Profile;
   unansweredCount: number;
   attentionCount?: number;
+  gazeteCount?: number;
   children: React.ReactNode;
 }) {
-  const { primary, secondary } = buildNav(profile, unansweredCount, attentionCount);
+  const { primary, secondary } = buildNav(
+    profile,
+    unansweredCount,
+    attentionCount,
+    gazeteCount,
+  );
   const isActive = useIsActive();
 
   return (
