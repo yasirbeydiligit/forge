@@ -1023,4 +1023,55 @@ export const insightRules = pgTable(
   ],
 );
 
+/* -------------------------------------------------------------------------- */
+/*  Forge Gazete — frozen athlete-facing period report issues                 */
+/* -------------------------------------------------------------------------- */
+
+export const reportPeriodType = pgEnum("report_period_type", [
+  "weekly",
+  "monthly",
+  "milestone",
+]);
+
+/**
+ * A printed Gazete issue. `payload` is the fully digested content (headline,
+ * stories, stat table, photo refs by ID) — never raw data, never recomputed:
+ * once printed an issue is immutable (column-level GRANT restricts athlete
+ * updates to read_at; see 0031). Uniqueness is on period_end because all
+ * milestone issues share period_start (the athlete's journey start).
+ */
+export const reportIssues = pgTable(
+  "report_issues",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    athleteId: uuid("athlete_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    periodType: reportPeriodType("period_type").notNull(),
+    periodStart: date("period_start").notNull(),
+    periodEnd: date("period_end").notNull(),
+    // 3/6/9/12/24… — only for milestone issues (CHECK enforces both ways).
+    milestoneMonths: integer("milestone_months"),
+    // Per-athlete, per-type sequential number ("Hafta Sayısı 3").
+    issueNumber: integer("issue_number").notNull(),
+    payload: jsonb("payload").notNull(),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    unique("report_issues_athlete_type_end_key").on(
+      t.athleteId,
+      t.periodType,
+      t.periodEnd,
+    ),
+    index("report_issues_athlete_idx").on(t.athleteId, t.periodEnd),
+    check(
+      "report_issues_milestone_months_check",
+      sql`(${t.periodType} = 'milestone') = (${t.milestoneMonths} IS NOT NULL)`,
+    ),
+  ],
+);
+
 void authUserId; // referenced for documentation of the auth.users linkage

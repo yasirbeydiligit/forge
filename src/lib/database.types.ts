@@ -1412,6 +1412,53 @@ export type Database = {
           },
         ]
       }
+      report_issues: {
+        Row: {
+          athlete_id: string
+          created_at: string
+          id: string
+          issue_number: number
+          milestone_months: number | null
+          payload: Json
+          period_end: string
+          period_start: string
+          period_type: Database["public"]["Enums"]["report_period_type"]
+          read_at: string | null
+        }
+        Insert: {
+          athlete_id: string
+          created_at?: string
+          id?: string
+          issue_number: number
+          milestone_months?: number | null
+          payload: Json
+          period_end: string
+          period_start: string
+          period_type: Database["public"]["Enums"]["report_period_type"]
+          read_at?: string | null
+        }
+        Update: {
+          athlete_id?: string
+          created_at?: string
+          id?: string
+          issue_number?: number
+          milestone_months?: number | null
+          payload?: Json
+          period_end?: string
+          period_start?: string
+          period_type?: Database["public"]["Enums"]["report_period_type"]
+          read_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_issues_athlete_id_profiles_id_fk"
+            columns: ["athlete_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tracker_settings: {
         Row: {
           athlete_id: string
@@ -1614,6 +1661,7 @@ export type Database = {
         | "intra_workout"
         | "post_workout"
         | "night"
+      report_period_type: "weekly" | "monthly" | "milestone"
       training_goal: "muscle_gain" | "strength" | "fat_loss" | "maintenance"
       user_role: "coach" | "athlete"
       user_sex: "male" | "female"
@@ -1784,6 +1832,7 @@ export const Constants = {
         "post_workout",
         "night",
       ],
+      report_period_type: ["weekly", "monthly", "milestone"],
       training_goal: ["muscle_gain", "strength", "fat_loss", "maintenance"],
       user_role: ["coach", "athlete"],
       user_sex: ["male", "female"],
