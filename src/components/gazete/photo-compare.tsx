@@ -66,7 +66,7 @@ export function PhotoCompare({
             <span className="font-bold text-lab-ink">{p.label}</span>
             <span>
               {formatDate(p.date, "d MMM yyyy")}
-              {p.weight != null ? ` · ${p.weight} kg` : ""}
+              {p.weight != null ? ` · ${p.weight.toLocaleString("tr-TR", { maximumFractionDigits: 1 })} kg` : ""}
             </span>
           </figcaption>
         </figure>

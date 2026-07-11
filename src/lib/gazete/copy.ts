@@ -25,6 +25,11 @@ export function pickVariant<T>(pool: readonly T[], seed: string): T {
   return pool[hash(seed) % pool.length];
 }
 
+/** Turkish print formatting: decimal comma, thousands dot ("1,8", "9.412"). */
+export function trNum(v: number): string {
+  return v.toLocaleString("tr-TR", { maximumFractionDigits: 1 });
+}
+
 export function fillTemplate(
   tpl: Template,
   slots: Record<string, string | number>,
@@ -39,7 +44,7 @@ export function fillTemplate(
       missing = true;
       return "";
     }
-    return String(v);
+    return typeof v === "number" ? trNum(v) : v;
   });
   return missing ? null : text;
 }

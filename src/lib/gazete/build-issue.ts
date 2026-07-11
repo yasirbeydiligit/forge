@@ -18,6 +18,7 @@ import {
   NEUTRAL_HEADLINES,
   pickVariant,
   STORY_BODIES,
+  trNum,
 } from "./copy";
 import { extractFacts, type Fact, type FactType } from "./facts";
 
@@ -109,9 +110,9 @@ function leadStat(fact: Fact): IssuePayload["lead"]["stat"] {
 function storyStat(fact: Fact): { value: string; label: string } | null {
   switch (fact.type) {
     case "pr_count":
-      return { value: `${fact.slots.weight} kg`, label: String(fact.slots.exercise) };
+      return { value: `${trNum(Number(fact.slots.weight))} kg`, label: String(fact.slots.exercise) };
     case "weight_trend":
-      return { value: `${fact.slots.deltaKg} kg`, label: String(fact.slots.direction) };
+      return { value: `${trNum(Number(fact.slots.deltaKg))} kg`, label: String(fact.slots.direction) };
     case "consistency":
       return { value: `${fact.slots.sessions}/${fact.slots.planned}`, label: "gün" };
     case "volume_trend":
@@ -119,7 +120,7 @@ function storyStat(fact: Fact): { value: string; label: string } | null {
     case "protein_consistency":
       return { value: `${fact.slots.hit}/${fact.slots.logged}`, label: "gün" };
     case "sleep_improvement":
-      return { value: `+${fact.slots.delta} sa`, label: "uyku" };
+      return { value: `+${trNum(Number(fact.slots.delta))} sa`, label: "uyku" };
     case "steps_avg":
       return { value: formatNumber(Number(fact.slots.avg)), label: "adım/gün" };
     case "cardio_total":

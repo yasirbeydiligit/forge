@@ -27,6 +27,15 @@ describe("fillTemplate — zorunlu slot garantisi", () => {
     ).toBe("Bench için 105 kg");
   });
 
+  it("sayılar Türkçe biçimlenir: ondalık virgül, binlik nokta", () => {
+    expect(
+      fillTemplate({ text: "{deltaKg} kg {direction}", slots: ["deltaKg", "direction"] }, { deltaKg: 1.8, direction: "verdin" }),
+    ).toBe("1,8 kg verdin");
+    expect(
+      fillTemplate({ text: "Günde {avg} adım", slots: ["avg"] }, { avg: 9412 }),
+    ).toBe("Günde 9.412 adım");
+  });
+
   it("slots listesinde olmayan placeholder da doldurulur ama zorunluluk listeden gelir", () => {
     // Şablon yazarı slots'u eksik bildirdiyse bile metindeki placeholder
     // doldurulamıyorsa null dönmeli (çift güvence).
