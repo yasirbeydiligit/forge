@@ -91,11 +91,15 @@ export default async function SessionPlayerPage({
     .filter((r) => r.session)
     .map((r) => ({ ...r, session_date: r.session!.session_date }));
 
-  // Already-logged sets for this session, grouped by exercise (for resume).
+  // Already-logged sets for this session, grouped by workout_exercise row (for
+  // resume). Keyed by workout_exercise_id — not exercise_id — so sets logged
+  // under a session-scoped muadil swap still attach to their program slot;
+  // legacy rows without workout_exercise_id fall back to the exercise id.
   const setsByExercise = new Map<string, LogSet[]>();
   for (const s of session?.log_sets ?? []) {
-    if (!setsByExercise.has(s.exercise_id)) setsByExercise.set(s.exercise_id, []);
-    setsByExercise.get(s.exercise_id)!.push(s);
+    const key = s.workout_exercise_id ?? s.exercise_id;
+    if (!setsByExercise.has(key)) setsByExercise.set(key, []);
+    setsByExercise.get(key)!.push(s);
   }
   for (const list of setsByExercise.values()) {
     list.sort((x, y) => new Date(x.created_at).getTime() - new Date(y.created_at).getTime());
@@ -106,7 +110,8 @@ export default async function SessionPlayerPage({
       historyRows.filter((r) => r.exercise_id === we.exercise_id),
       date,
     );
-    const logged = setsByExercise.get(we.exercise_id) ?? [];
+    const logged =
+      setsByExercise.get(we.id) ?? setsByExercise.get(we.exercise_id) ?? [];
     return {
       workoutExerciseId: we.id,
       exerciseId: we.exercise_id,

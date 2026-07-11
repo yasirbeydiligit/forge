@@ -1,4 +1,4 @@
-import { evaluatePR, type PRSet } from "@/lib/pr/evaluate-pr";
+import { evaluatePR, type PRResult, type PRSet } from "@/lib/pr/evaluate-pr";
 
 import type { ExerciseState } from "./types";
 
@@ -9,7 +9,12 @@ import type { ExerciseState } from "./types";
  * never flagged, so the PR signal stays meaningful.
  */
 export function detectPr(history: PRSet[], set: PRSet): boolean {
-  return evaluatePR(set, history).isPR;
+  return detectPrResult(history, set).isPR;
+}
+
+/** Same check, keeping the full result (PR type + beaten reference) for UI copy. */
+export function detectPrResult(history: PRSet[], set: PRSet): PRResult {
+  return evaluatePR(set, history);
 }
 
 /**

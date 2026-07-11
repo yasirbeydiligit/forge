@@ -155,6 +155,113 @@ describe("sessionReducer", () => {
   });
 });
 
+const substitute = {
+  exerciseId: "e9",
+  name: "Chest Press Machine",
+  category: "İtiş",
+  stats: {
+    allTimePr: 80,
+    prevSessionWeights: [75, 75],
+    prevSessionSets: [{ weight: 75, reps: 10 }],
+    prHistory: [{ weight: 80, reps: 8, rir: null }],
+  },
+};
+
+describe("SUBSTITUTE_EXERCISE", () => {
+  it("swaps the exercise id and records the substitution (original id kept)", () => {
+    const s = createInitialState(baseInput);
+    const next = sessionReducer(s, {
+      type: "SUBSTITUTE_EXERCISE",
+      exerciseIndex: 1,
+      substitute,
+    });
+    expect(next.exercises[1].exerciseId).toBe("e9");
+    expect(next.exercises[1].substitute).toMatchObject({
+      originalExerciseId: "e2",
+      name: "Chest Press Machine",
+    });
+    // untouched sibling
+    expect(next.exercises[0].exerciseId).toBe("e1");
+    expect(next.exercises[0].substitute).toBeUndefined();
+  });
+
+  it("keeps the FIRST original id when substituting twice", () => {
+    let s = createInitialState(baseInput);
+    s = sessionReducer(s, { type: "SUBSTITUTE_EXERCISE", exerciseIndex: 1, substitute });
+    s = sessionReducer(s, {
+      type: "SUBSTITUTE_EXERCISE",
+      exerciseIndex: 1,
+      substitute: { ...substitute, exerciseId: "e10", name: "Incline DB Press" },
+    });
+    expect(s.exercises[1].exerciseId).toBe("e10");
+    expect(s.exercises[1].substitute?.originalExerciseId).toBe("e2");
+  });
+
+  it("clears the substitution when swapping back to the original exercise", () => {
+    let s = createInitialState(baseInput);
+    s = sessionReducer(s, { type: "SUBSTITUTE_EXERCISE", exerciseIndex: 1, substitute });
+    s = sessionReducer(s, {
+      type: "SUBSTITUTE_EXERCISE",
+      exerciseIndex: 1,
+      substitute: { ...substitute, exerciseId: "e2" },
+    });
+    expect(s.exercises[1].exerciseId).toBe("e2");
+    expect(s.exercises[1].substitute).toBeNull();
+  });
+});
+
+const addedExercise = {
+  localKey: "local-add-1",
+  exerciseId: "e20",
+  name: "Face Pull",
+  category: "Omuz",
+  target: { sets: 3, repsMin: null, repsMax: null, weight: null, rir: null, restSeconds: 90 },
+  stats: {
+    allTimePr: 25,
+    prevSessionWeights: [22.5],
+    prevSessionSets: [{ weight: 22.5, reps: 15 }],
+    prHistory: [{ weight: 25, reps: 12, rir: null }],
+  },
+};
+
+describe("ADD_EXERCISE / REMOVE_EXERCISE", () => {
+  it("appends a session-scoped exercise with its own target and stats", () => {
+    const s = sessionReducer(createInitialState(baseInput), {
+      type: "ADD_EXERCISE",
+      exercise: addedExercise,
+    });
+    expect(s.exercises).toHaveLength(3);
+    const added = s.exercises[2];
+    expect(added.workoutExerciseId).toBe("local-add-1");
+    expect(added.exerciseId).toBe("e20");
+    expect(added.sets).toEqual([]);
+    expect(added.added).toMatchObject({ name: "Face Pull", target: { sets: 3 } });
+  });
+
+  it("REMOVE_EXERCISE removes an added exercise without sets and clamps the cursor", () => {
+    let s = sessionReducer(createInitialState(baseInput), {
+      type: "ADD_EXERCISE",
+      exercise: addedExercise,
+    });
+    s = sessionReducer(s, { type: "SET_ACTIVE_EXERCISE", index: 2 });
+    s = sessionReducer(s, { type: "REMOVE_EXERCISE", exerciseIndex: 2 });
+    expect(s.exercises).toHaveLength(2);
+    expect(s.activeExerciseIndex).toBe(1);
+  });
+
+  it("REMOVE_EXERCISE refuses program exercises and added ones with logged sets", () => {
+    let s = sessionReducer(createInitialState(baseInput), {
+      type: "ADD_EXERCISE",
+      exercise: addedExercise,
+    });
+    // program exercise: untouched
+    expect(sessionReducer(s, { type: "REMOVE_EXERCISE", exerciseIndex: 0 }).exercises).toHaveLength(3);
+    // added but has a set: untouched
+    s = sessionReducer(s, { type: "COMPLETE_SET", exerciseIndex: 2, set: set() });
+    expect(sessionReducer(s, { type: "REMOVE_EXERCISE", exerciseIndex: 2 }).exercises).toHaveLength(3);
+  });
+});
+
 describe("hydrate", () => {
   it("keeps unsynced local sets (serverId null) and merges in server sets", () => {
     const server = createInitialState({
@@ -198,5 +305,45 @@ describe("hydrate", () => {
   it("returns server state untouched when there is no persisted state", () => {
     const server = createInitialState(baseInput);
     expect(hydrate({ server, persisted: null })).toBe(server);
+  });
+
+  it("appends locally-added exercises (with ALL their sets) after the server list", () => {
+    const server = createInitialState(baseInput);
+    let persisted = createInitialState(baseInput);
+    persisted = sessionReducer(persisted, { type: "ADD_EXERCISE", exercise: addedExercise });
+    // one synced + one pending set on the added exercise — both must survive,
+    // because the server-built state knows nothing about this exercise.
+    persisted = sessionReducer(persisted, {
+      type: "COMPLETE_SET",
+      exerciseIndex: 2,
+      set: set({ localId: "as1", serverId: "srv-a1" }),
+    });
+    persisted = sessionReducer(persisted, {
+      type: "COMPLETE_SET",
+      exerciseIndex: 2,
+      set: set({ localId: "as2", serverId: null }),
+    });
+
+    const merged = hydrate({ server, persisted });
+    expect(merged.exercises).toHaveLength(3);
+    const added = merged.exercises[2];
+    expect(added.added?.name).toBe("Face Pull");
+    expect(added.sets.map((x) => x.localId)).toEqual(["as1", "as2"]);
+  });
+
+  it("carries a local substitution over the server-built exercise", () => {
+    const server = createInitialState(baseInput);
+    let persisted = createInitialState(baseInput);
+    persisted = sessionReducer(persisted, {
+      type: "SUBSTITUTE_EXERCISE",
+      exerciseIndex: 1,
+      substitute,
+    });
+
+    const merged = hydrate({ server, persisted });
+    expect(merged.exercises[1].exerciseId).toBe("e9");
+    expect(merged.exercises[1].substitute?.originalExerciseId).toBe("e2");
+    // non-substituted exercise untouched
+    expect(merged.exercises[0].exerciseId).toBe("e1");
   });
 });

@@ -1,47 +1,26 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import gsap from "gsap";
-import {
-  ArrowRight,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  CloudOff,
-  Flag,
-  Loader2,
-  Play,
-  Settings,
-  Timer,
-  Trash2,
-  X,
-} from "lucide-react";
+import { ChevronDown, CloudOff, Loader2, Play, Timer, X } from "lucide-react";
 
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { formatNumber, formatRepRange, formatRest } from "@/lib/format";
 import { sessionTotals } from "@/lib/session/totals";
+import type { ExerciseState } from "@/lib/session/types";
 import { cn } from "@/lib/utils";
 
 import type { SessionReport } from "@/lib/reports/session-report";
 
 import { getSessionReportAction } from "./actions";
-import { ExerciseHistory } from "./exercise-history";
+import { ActiveSetView } from "./active-set-view";
+import { OverviewSheet, type OverviewExercise } from "./overview-sheet";
 import type { PlayerData } from "./player-data";
-import { RestTimer } from "./rest-timer";
+import { RestSheet, type RestSheetNext, type RestSheetPr } from "./rest-sheet";
 import {
   SessionSummary,
   type SummaryExercise,
   type SummaryExerciseDetail,
 } from "./session-summary";
-import { SetInput } from "./set-input";
 import { useSessionPlayer } from "./use-session-player";
 
 function fmtElapsed(ms: number) {
@@ -54,7 +33,7 @@ function fmtElapsed(ms: number) {
 }
 
 /** Live session clock; ticks while running, freezes once the session is
- * finished (so "Seansı bitir" stops the timer immediately). */
+ * finished (so "Antrenmanı bitir" stops the timer immediately). */
 function useElapsed(startedAt: number | null, stoppedAt: number | null) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -70,19 +49,70 @@ function useElapsed(startedAt: number | null, stoppedAt: number | null) {
 function plannedLine(target: PlayerData["exercises"][number]["target"], category: string | null) {
   const reps = formatRepRange(target.repsMin, target.repsMax);
   const rest = formatRest(target.restSeconds);
-  return [
-    category,
-    target.sets ? `${target.sets} ×` : null,
-    reps ?? null,
+  const scheme = [
+    target.sets ? `hedef ${target.sets}` : null,
+    reps ? `× ${reps}` : null,
     target.weight != null ? `@ ${formatNumber(target.weight)} kg` : null,
-    target.rir != null ? `RIR ${formatNumber(target.rir)}` : null,
-    rest,
   ]
     .filter(Boolean)
-    .join(" · ");
+    .join(" ");
+  return [category, scheme || null, rest].filter(Boolean).join(" · ");
+}
+
+function isExerciseDone(ex: ExerciseState, targetSets: number | null): boolean {
+  return targetSets != null && targetSets > 0 && ex.sets.length >= targetSets;
+}
+
+type ResolvedExercise = {
+  name: string;
+  category: string | null;
+  target: PlayerData["exercises"][number]["target"];
+  /** History behind the "Geçen" strip, suggestions and summary deltas. */
+  strip: {
+    prevSessionSets: { weight: number; reps: number | null }[];
+    allTimePr: number | null;
+    prevSessionWeights: number[];
+  };
+  isAdded: boolean;
+  isSubstituted: boolean;
+};
+
+/**
+ * One view of an exercise slot regardless of its origin: program row, muadil
+ * swap (program row + substitute overlay) or session-added (state only).
+ */
+function resolveExercise(
+  data: PlayerData,
+  ex: ExerciseState | undefined,
+  i: number,
+): ResolvedExercise | null {
+  if (!ex) return null;
+  if (ex.added) {
+    return {
+      name: ex.added.name,
+      category: ex.added.category,
+      target: ex.added.target,
+      strip: ex.added.stats,
+      isAdded: true,
+      isSubstituted: false,
+    };
+  }
+  const meta = data.exercises[i];
+  if (!meta) return null;
+  const stats = ex.substitute ? ex.substitute.stats : meta.stats;
+  return {
+    name: ex.substitute?.name ?? meta.name,
+    category: ex.substitute ? (ex.substitute.category ?? meta.category) : meta.category,
+    target: meta.target,
+    strip: stats,
+    isAdded: false,
+    isSubstituted: ex.substitute != null,
+  };
 }
 
 type Player = ReturnType<typeof useSessionPlayer>;
+
+type RestSheetState = { pr: RestSheetPr | null; next: RestSheetNext };
 
 export function SessionPlayer({ data }: { data: PlayerData }) {
   const router = useRouter();
@@ -93,6 +123,10 @@ export function SessionPlayer({ data }: { data: PlayerData }) {
   const started = state.startedAt != null;
   const finished = state.finishedAt != null;
   const elapsedMs = useElapsed(state.startedAt, state.finishedAt);
+  const timerLabel = started ? fmtElapsed(elapsedMs) : null;
+
+  const [restSheet, setRestSheet] = useState<RestSheetState | null>(null);
+  const [overviewOpen, setOverviewOpen] = useState(false);
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background">
@@ -101,80 +135,34 @@ export function SessionPlayer({ data }: { data: PlayerData }) {
         className="paper-grain pointer-events-none absolute inset-0 opacity-[0.035] mix-blend-multiply"
       />
 
-      {/* Top bar — hero session clock */}
-      <header className="pt-safe relative z-10 flex h-16 shrink-0 items-center justify-between gap-2 border-b border-border px-3">
+      {/* Top bar: exit · workout label · session clock (mono, green) */}
+      <header className="pt-safe relative z-10 flex h-14 shrink-0 items-center justify-between gap-2 px-3">
         <button
           type="button"
           onClick={() => router.push(exitTo)}
           aria-label="Kapat"
-          className="flex size-10 items-center justify-center rounded-full text-muted-foreground transition-colors duration-[var(--dur-fast)] ease-soft active:bg-muted"
+          className="flex size-11 items-center justify-center rounded-full text-muted-foreground transition-colors duration-[var(--dur-fast)] ease-soft active:bg-muted"
         >
           <X className="size-5" />
         </button>
 
-        <div className="flex min-w-0 flex-1 flex-col items-center">
-          {started ? (
-            <>
-              <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-                Süre
-              </span>
-              <span className="font-mono text-2xl font-semibold leading-none tabular-nums text-foreground">
-                {fmtElapsed(elapsedMs)}
-              </span>
-            </>
-          ) : (
-            <span className="truncate font-serif text-base font-semibold text-lab-ink">
-              {data.workoutName}
-            </span>
-          )}
-        </div>
+        <button
+          type="button"
+          onClick={() => setOverviewOpen(true)}
+          className="min-w-0 truncate font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground"
+        >
+          {data.workoutName}
+        </button>
 
-        <div className="flex items-center gap-1">
+        <div className="flex w-[4.5rem] items-center justify-end gap-1.5">
           {!player.online ? (
             <CloudOff className="size-4 text-lab-amber" aria-label="Çevrimdışı" />
           ) : player.isSyncing ? (
             <Loader2 className="size-4 animate-spin text-muted-foreground" aria-label="Senkronlanıyor" />
           ) : null}
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                aria-label="Ayarlar"
-                className="flex size-10 items-center justify-center rounded-full text-muted-foreground transition-colors duration-[var(--dur-fast)] ease-soft active:bg-muted"
-              >
-                <Settings className="size-5" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="z-[60] w-56">
-              <DropdownMenuLabel>Seans ayarları</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuCheckboxItem
-                checked={player.autoRest}
-                onCheckedChange={(v) => player.setAutoRest(v)}
-                onSelect={(e) => e.preventDefault()}
-              >
-                Otomatik dinlenme
-              </DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem
-                checked={player.soundHaptics}
-                onCheckedChange={(v) => player.setSoundHaptics(v)}
-                onSelect={(e) => e.preventDefault()}
-              >
-                Ses & titreşim
-              </DropdownMenuCheckboxItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {started && !finished ? (
-            <button
-              type="button"
-              onClick={player.goToSummary}
-              className="inline-flex h-9 items-center gap-1 rounded-full px-3 text-sm font-medium text-muted-foreground transition-colors duration-[var(--dur-fast)] ease-soft active:bg-muted"
-            >
-              <Flag className="size-4" /> Bitir
-            </button>
-          ) : null}
+          <span className="font-mono text-sm tabular-nums text-lab-green">
+            {timerLabel ?? "—:—"}
+          </span>
         </div>
       </header>
 
@@ -188,342 +176,363 @@ export function SessionPlayer({ data }: { data: PlayerData }) {
           }}
         />
       ) : (
-        <ActiveView data={data} player={player} started={started} />
+        <ActiveScreen
+          data={data}
+          player={player}
+          started={started}
+          restSheet={restSheet}
+          setRestSheet={setRestSheet}
+          onOpenOverview={() => setOverviewOpen(true)}
+        />
       )}
+
+      {!finished ? (
+        <OverviewLayer
+          data={data}
+          player={player}
+          timerLabel={timerLabel}
+          open={overviewOpen}
+          onClose={() => setOverviewOpen(false)}
+        />
+      ) : null}
     </div>
   );
 }
 
 /* ----------------------------------------------------------------------- */
-/*  Active (also hosts the not-started start gate)                         */
+/*  Screen 1 host (start gate + one-set screen + rest layer)               */
 /* ----------------------------------------------------------------------- */
 
-function ActiveView({
+function ActiveScreen({
   data,
   player,
   started,
+  restSheet,
+  setRestSheet,
+  onOpenOverview,
 }: {
   data: PlayerData;
   player: Player;
   started: boolean;
+  restSheet: RestSheetState | null;
+  setRestSheet: (s: RestSheetState | null) => void;
+  onOpenOverview: () => void;
 }) {
   const { state } = player;
   const idx = state.activeExerciseIndex;
-  const meta = data.exercises[idx];
   const exState = state.exercises[idx];
-  if (!meta || !exState) return null;
+  const resolved = resolveExercise(data, exState, idx);
+  if (!resolved || !exState) return null;
 
-  const isFirst = idx === 0;
-  const isLast = idx === data.exercises.length - 1;
-  const restSeconds = meta.target.restSeconds ?? null;
+  const isLast = idx === state.exercises.length - 1;
+  const restSeconds = resolved.target.restSeconds ?? null;
 
   // Suggested values: the last set entered this session, else last session's
-  // last set, else the program target.
+  // last set (the exercise's OWN history — the substitute's after a muadil
+  // swap, the added exercise's after hareket ekle), else the program target.
   const lastThis = exState.sets.at(-1) ?? null;
-  const prevLast = meta.stats.prevSessionSets.at(-1) ?? null;
-  const suggestedWeight = lastThis?.weight ?? prevLast?.weight ?? meta.target.weight ?? null;
-  const suggestedReps = lastThis?.reps ?? prevLast?.reps ?? meta.target.repsMin ?? null;
+  const prevLast = resolved.strip.prevSessionSets.at(-1) ?? null;
+  const suggestedWeight = lastThis?.weight ?? prevLast?.weight ?? resolved.target.weight ?? null;
+  const suggestedReps = lastThis?.reps ?? prevLast?.reps ?? resolved.target.repsMin ?? null;
 
-  const finishExercise = () => {
+  const resolvedName = (i: number) =>
+    resolveExercise(data, state.exercises[i], i)?.name ?? "Egzersiz";
+
+  const completeSet = (input: {
+    weight: number | null;
+    reps: number | null;
+    rir: number | null;
+    note: string | null;
+  }) => {
+    const result = player.completeSet(idx, input);
+    const setsAfter = exState.sets.length + 1;
+    const exerciseDone = resolved.target.sets != null && setsAfter >= resolved.target.sets;
+
+    if (player.autoRest && restSeconds && restSeconds > 0) player.startRest(idx, restSeconds);
+
+    const next: RestSheetNext = !exerciseDone
+      ? {
+          kind: "set",
+          setNumber: setsAfter + 1,
+          weight: input.weight ?? suggestedWeight,
+          reps: input.reps ?? suggestedReps,
+        }
+      : isLast
+        ? { kind: "summary" }
+        : { kind: "exercise", name: resolvedName(idx + 1) };
+
+    const pr: RestSheetPr | null = result.isPR && result.type
+      ? { type: result.type, weight: input.weight, reps: input.reps }
+      : null;
+
+    // The sheet is the rest layer AND the PR / hand-off moment; skip it only
+    // when there is nothing to show (no rest, no PR, mid-exercise).
+    if ((player.autoRest && restSeconds) || pr || exerciseDone) {
+      setRestSheet({ pr, next });
+    }
+  };
+
+  const advance = () => {
     if (isLast) {
       player.goToSummary();
-      return;
+    } else {
+      player.setActiveExercise(idx + 1);
     }
-    if (player.autoRest && !state.rest && restSeconds) player.startRest(idx, restSeconds);
-    player.setActiveExercise(idx + 1);
+    setRestSheet(null);
   };
+
+  const restActive = state.rest != null && state.rest.endsAt > Date.now();
 
   return (
     <>
-      {/* Exercise rail */}
-      <nav className="no-scrollbar relative z-10 flex shrink-0 gap-2 overflow-x-auto border-b border-border px-3 py-2">
-        {data.exercises.map((e, i) => {
-          const done = state.exercises[i].sets.length;
-          const targetSets = e.target.sets ?? 0;
-          const complete = targetSets > 0 && done >= targetSets;
-          const active = i === idx;
-          return (
-            <button
-              key={e.workoutExerciseId}
-              type="button"
-              onClick={() => player.setActiveExercise(i)}
-              className={cn(
-                "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-colors duration-[var(--dur-fast)] ease-soft",
-                active
-                  ? "border-primary/40 bg-primary/10 font-semibold text-primary"
-                  : "border-border text-muted-foreground",
-              )}
-            >
-              {complete ? (
-                <Check className="size-3.5 text-lab-green" />
-              ) : (
-                <span className="font-mono text-[11px]">{i + 1}</span>
-              )}
-              <span className="max-w-[8rem] truncate">{e.name}</span>
-            </button>
-          );
-        })}
-      </nav>
+      {/* Exercise progress: one segment per exercise (added ones included) */}
+      <div className="relative z-10 flex shrink-0 gap-1 px-4 pb-3" aria-hidden>
+        {state.exercises.map((e, i) => (
+          <span
+            key={e.workoutExerciseId}
+            className={cn(
+              "h-[3px] flex-1 rounded-full",
+              isExerciseDone(e, resolveExercise(data, e, i)?.target.sets ?? null)
+                ? "bg-primary"
+                : i === idx
+                  ? "bg-primary/40"
+                  : "bg-border",
+            )}
+          />
+        ))}
+      </div>
 
-      {/* Mobile: stacked (scroll + footer). Desktop: two-pane (focus | logging). */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
-        {/* Focus / tracking pane */}
-        <div className="flex-1 overflow-y-auto px-4 py-5 lg:px-8 lg:py-8">
-          <div className="mx-auto w-full max-w-md space-y-4 lg:max-w-xl">
-            <div>
-              <div className="flex items-center justify-between gap-2">
-                <button
-                  type="button"
-                  onClick={() => player.setActiveExercise(idx - 1)}
-                  disabled={isFirst}
-                  aria-label="Önceki egzersiz"
-                  className="flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors duration-[var(--dur-fast)] ease-soft active:bg-muted disabled:opacity-30"
-                >
-                  <ChevronLeft className="size-5" />
-                </button>
-                <p className="text-label text-accent-training">
-                  Egzersiz {idx + 1}/{data.exercises.length}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => player.setActiveExercise(idx + 1)}
-                  disabled={isLast}
-                  aria-label="Sonraki egzersiz"
-                  className="flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors duration-[var(--dur-fast)] ease-soft active:bg-muted disabled:opacity-30"
-                >
-                  <ChevronRight className="size-5" />
-                </button>
-              </div>
-              <h2 className="mt-1 text-center font-serif text-2xl font-semibold leading-tight text-lab-ink lg:text-3xl">
-                {meta.name}
-              </h2>
-              <p className="mt-1 text-center font-mono text-xs tabular-nums text-muted-foreground">
-                {plannedLine(meta.target, meta.category)}
-              </p>
-              {meta.notes ? (
-                <p className="mt-1.5 text-center text-xs italic text-muted-foreground">
-                  {meta.notes}
-                </p>
-              ) : null}
-            </div>
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-4">
+        <div className="mx-auto flex w-full max-w-md flex-1 flex-col lg:max-w-lg lg:justify-center">
+          <p className="text-label text-accent-training">
+            Egzersiz {idx + 1}/{state.exercises.length}
+          </p>
 
-            {started || exState.sets.length > 0 ? (
-              <LoggedSets meta={meta} sets={exState.sets} onDelete={player.deleteSet} />
-            ) : (
-              <p className="rounded-xl border border-dashed border-border px-4 py-5 text-center text-sm text-muted-foreground">
+          <button
+            type="button"
+            onClick={onOpenOverview}
+            aria-label="Egzersiz listesini aç"
+            className="mt-0.5 flex items-center gap-1.5 text-left"
+          >
+            <h2 className="min-w-0 truncate font-serif text-[1.75rem] font-normal leading-tight text-lab-ink">
+              {resolved.name}
+            </h2>
+            <ChevronDown className="size-5 shrink-0 text-muted-foreground" />
+          </button>
+
+          <p className="mb-3 mt-0.5 font-mono text-xs tabular-nums text-muted-foreground">
+            {plannedLine(resolved.target, resolved.category)}
+            {resolved.isSubstituted ? " · muadil" : resolved.isAdded ? " · eklendi" : ""}
+          </p>
+
+          {!started ? (
+            <div className="flex flex-1 flex-col justify-end pb-2">
+              <p className="mb-3 rounded-xl border border-dashed border-border px-4 py-5 text-center text-sm text-muted-foreground">
                 Hazır olduğunda başlat — hedefler yüklü.
               </p>
-            )}
-
-            <ExerciseHistory stats={meta.stats} />
-          </div>
-        </div>
-
-        {/* Logging pane: bottom footer on mobile, right sidebar on desktop */}
-        <div className="pb-safe relative z-10 shrink-0 border-t border-border bg-background/95 px-4 pt-3 backdrop-blur lg:flex lg:w-[384px] lg:flex-col lg:justify-center lg:overflow-y-auto lg:border-l lg:border-t-0 lg:bg-surface/30 lg:px-6 lg:py-8 lg:backdrop-blur-none">
-          <div className="mx-auto w-full max-w-md">
-            {!started ? (
-              <div className="pb-3 lg:pb-0">
-                <button
-                  type="button"
-                  onClick={player.start}
-                  className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-base font-semibold text-primary-foreground shadow-raised transition-transform duration-[var(--dur-fast)] ease-soft active:scale-[0.98]"
-                >
-                  <Play className="size-5" /> Antrenmanı başlat
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-3 pb-3 lg:pb-0">
-                {state.rest ? (
-                  <RestTimer
-                    endsAt={state.rest.endsAt}
-                    totalSeconds={data.exercises[state.rest.exerciseIndex]?.target.restSeconds ?? 120}
-                    onDone={player.notifyRestDone}
-                    onSkip={player.clearRest}
-                    onExtend={player.extendRest}
-                  />
-                ) : restSeconds ? (
-                  <button
-                    type="button"
-                    onClick={() => player.startRest(idx, restSeconds)}
-                    className="flex h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border text-sm text-muted-foreground transition-colors duration-[var(--dur-fast)] ease-soft active:bg-muted"
-                  >
-                    <Timer className="size-4" /> Dinlenmeyi başlat · {formatRest(restSeconds)}
-                  </button>
-                ) : null}
-
-                <SetInput
-                  key={`${idx}-${exState.sets.length}`}
-                  setNumber={exState.sets.length + 1}
-                  suggestedWeight={suggestedWeight}
-                  suggestedReps={suggestedReps}
-                  targetRir={meta.target.rir}
-                  onComplete={(input) => {
-                    const pr = player.completeSet(idx, input);
-                    if (player.autoRest && restSeconds && restSeconds > 0) {
-                      player.startRest(idx, restSeconds);
-                    }
-                    return pr;
-                  }}
+              <button
+                type="button"
+                onClick={player.start}
+                className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-base font-semibold text-primary-foreground shadow-raised transition-transform duration-[var(--dur-fast)] ease-soft active:scale-[0.98]"
+              >
+                <Play className="size-5" /> Antrenmanı başlat
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-1 flex-col justify-end">
+              {restActive && !restSheet ? (
+                <RestChip
+                  endsAt={state.rest!.endsAt}
+                  onOpen={() =>
+                    setRestSheet({
+                      pr: null,
+                      next: {
+                        kind: "set",
+                        setNumber: exState.sets.length + 1,
+                        weight: suggestedWeight,
+                        reps: suggestedReps,
+                      },
+                    })
+                  }
                 />
+              ) : null}
 
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => player.setActiveExercise(idx - 1)}
-                    disabled={isFirst}
-                    className="inline-flex h-11 items-center gap-1.5 rounded-xl border border-border px-3 text-sm text-muted-foreground transition-colors duration-[var(--dur-fast)] ease-soft active:bg-muted disabled:opacity-40"
-                  >
-                    <ChevronLeft className="size-4" /> Önceki
-                  </button>
-                  <button
-                    type="button"
-                    onClick={finishExercise}
-                    className={cn(
-                      "ml-auto inline-flex h-11 flex-1 items-center justify-center gap-1.5 rounded-xl px-4 text-sm font-semibold transition-[transform,background-color] duration-[var(--dur-fast)] ease-soft active:scale-[0.98]",
-                      isLast
-                        ? "bg-primary text-primary-foreground shadow-raised"
-                        : "border border-border bg-paper text-foreground",
-                    )}
-                  >
-                    {isLast ? (
-                      <>
-                        <Flag className="size-4" /> Seansı bitir
-                      </>
-                    ) : (
-                      <>
-                        Hareketi bitir <ArrowRight className="size-4" />
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+              <ActiveSetView
+                key={`${idx}-${exState.sets.length}-${exState.exerciseId}`}
+                sets={exState.sets}
+                targetSets={resolved.target.sets}
+                suggestedWeight={suggestedWeight}
+                suggestedReps={suggestedReps}
+                prevSessionSets={resolved.strip.prevSessionSets}
+                allTimePr={resolved.strip.allTimePr}
+                onCompleteSet={completeSet}
+                onDeleteSet={player.deleteSet}
+              />
+            </div>
+          )}
         </div>
       </div>
+
+      <RestSheet
+        open={restSheet != null}
+        restEndsAt={state.rest?.endsAt ?? null}
+        totalSeconds={
+          state.rest != null
+            ? (resolveExercise(data, state.exercises[state.rest.exerciseIndex], state.rest.exerciseIndex)
+                ?.target.restSeconds ?? 120)
+            : 120
+        }
+        pr={restSheet?.pr ?? null}
+        next={restSheet?.next ?? { kind: "set", setNumber: 1, weight: null, reps: null }}
+        onExtend={player.extendRest}
+        onSkip={() => {
+          player.clearRest();
+          if (restSheet && restSheet.next.kind !== "set") advance();
+          else setRestSheet(null);
+        }}
+        onClose={() => setRestSheet(null)}
+        onAdvance={advance}
+        onDone={player.notifyRestDone}
+      />
     </>
   );
 }
 
-function LoggedSets({
-  meta,
-  sets,
-  onDelete,
-}: {
-  meta: PlayerData["exercises"][number];
-  sets: Player["state"]["exercises"][number]["sets"];
-  onDelete: (localId: string) => void;
-}) {
-  const listRef = useRef<HTMLDivElement>(null);
-  // Rows that already had their entrance, so a re-render never replays them:
-  // switching to an exercise staggers its whole table in (RevealStagger
-  // pattern), each newly logged set lifts in alone. Reset per exercise so a
-  // revisit gets its entrance again. Rows render visible without JS.
-  const revealedRef = useRef({ exerciseId: meta.workoutExerciseId, ids: new Set<string>() });
-
+/** Compact countdown chip when the sheet is dismissed but the rest still runs. */
+function RestChip({ endsAt, onOpen }: { endsAt: number; onOpen: () => void }) {
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const root = listRef.current;
-    if (!root) return;
-    if (revealedRef.current.exerciseId !== meta.workoutExerciseId) {
-      revealedRef.current = { exerciseId: meta.workoutExerciseId, ids: new Set() };
-    }
-    const seen = revealedRef.current.ids;
-    const fresh = Array.from(root.querySelectorAll<HTMLElement>("[data-set-row]")).filter((el) => {
-      const id = el.dataset.setRow ?? "";
-      if (seen.has(id)) return false;
-      seen.add(id);
-      return true;
-    });
-    if (fresh.length === 0) return;
+    const id = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(id);
+  }, []);
+  const remaining = Math.max(0, endsAt - now);
+  if (remaining === 0) return null;
+  const m = Math.floor(remaining / 60000);
+  const s = Math.ceil((remaining % 60000) / 1000) % 60;
 
-    const mm = gsap.matchMedia();
-    mm.add("(prefers-reduced-motion: no-preference)", () => {
-      const ctx = gsap.context(() => {
-        gsap.from(fresh, {
-          y: 10,
-          autoAlpha: 0,
-          duration: 0.4,
-          ease: "power2.out",
-          stagger: 0.06,
-        });
-      }, root);
-      return () => ctx.revert();
-    });
-    return () => mm.revert();
-  }, [sets, meta.workoutExerciseId]);
-
-  if (sets.length === 0) {
-    return (
-      <p className="rounded-xl border border-dashed border-border px-4 py-5 text-center text-sm text-muted-foreground">
-        İlk seti gir — hedef hazır, sadece onayla.
-      </p>
-    );
-  }
   return (
-    <div ref={listRef} className="overflow-hidden rounded-xl border border-paper-border">
-      <div className="grid grid-cols-[1.5rem_1fr_1fr_1fr_1.75rem] items-center gap-2 bg-surface px-3 py-1.5 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-        <span className="text-center">Set</span>
-        <span className="text-center">Kg</span>
-        <span className="text-center">Tekrar</span>
-        <span className="text-center">RIR</span>
-        <span />
-      </div>
-      {sets.map((s, i) => {
-        const prev = meta.stats.prevSessionWeights[i];
-        const delta =
-          prev != null && s.weight != null
-            ? Math.round((s.weight - prev) * 10) / 10
+    <button
+      type="button"
+      onClick={onOpen}
+      className="mb-2.5 flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-primary/25 bg-primary/5 font-mono text-xs tabular-nums text-primary transition-colors duration-[var(--dur-fast)] ease-soft active:bg-primary/10"
+    >
+      <Timer className="size-3.5" aria-hidden />
+      Dinlenme {m}:{String(s).padStart(2, "0")} — aç
+    </button>
+  );
+}
+
+/* ----------------------------------------------------------------------- */
+/*  Screen 3 wiring                                                        */
+/* ----------------------------------------------------------------------- */
+
+function OverviewLayer({
+  data,
+  player,
+  timerLabel,
+  open,
+  onClose,
+}: {
+  data: PlayerData;
+  player: Player;
+  timerLabel: string | null;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const { state } = player;
+  const idx = state.activeExerciseIndex;
+
+  const exercises: OverviewExercise[] = state.exercises
+    .map((ex, i) => {
+      const resolved = resolveExercise(data, ex, i);
+      if (!resolved) return null;
+      const done = isExerciseDone(ex, resolved.target.sets);
+      const active = i === idx;
+
+      let subLine: string;
+      if (done) {
+        const weights = ex.sets
+          .map((s) => s.weight)
+          .filter((w): w is number => w != null);
+        const range =
+          weights.length > 0
+            ? [Math.min(...weights), Math.max(...weights)]
+                .filter((v, j, a) => a.indexOf(v) === j)
+                .map((w) => formatNumber(w))
+                .join("–")
             : null;
-        return (
-          <div
-            key={s.localId}
-            data-set-row={s.localId}
-            className={cn(
-              "grid grid-cols-[1.5rem_1fr_1fr_1fr_1.75rem] items-center gap-2 border-t border-paper-border px-3 py-2 text-sm",
-              s.pr && "forge-pr-glow",
-            )}
-          >
-            <span className="text-center font-mono text-xs text-muted-foreground">{i + 1}</span>
-            <span className="flex flex-col items-center leading-none">
-              <span className="inline-flex items-center gap-1 font-mono tabular-nums text-foreground">
-                {formatNumber(s.weight)}
-                {s.pr ? (
-                  <span className="rounded bg-lab-green/15 px-1 text-[9px] font-semibold uppercase tracking-wider text-lab-green">
-                    PR
-                  </span>
-                ) : null}
-              </span>
-              {delta != null && delta !== 0 ? (
-                <span
-                  className={cn(
-                    "mt-0.5 font-mono text-[10px]",
-                    delta > 0 ? "text-lab-green" : "text-lab-amber",
-                  )}
-                >
-                  {delta > 0 ? "+" : ""}
-                  {delta}
-                </span>
-              ) : null}
-            </span>
-            <span className="text-center font-mono tabular-nums text-foreground">
-              {s.reps ?? "—"}
-            </span>
-            <span className="text-center font-mono tabular-nums text-muted-foreground">
-              {s.rir != null ? formatNumber(s.rir) : "—"}
-            </span>
-            <button
-              type="button"
-              onClick={() => onDelete(s.localId)}
-              aria-label="Seti sil"
-              className="flex size-7 items-center justify-center justify-self-center text-muted-foreground transition-colors duration-[var(--dur-fast)] ease-soft hover:text-destructive"
-            >
-              <Trash2 className="size-3.5" />
-            </button>
-          </div>
-        );
-      })}
-    </div>
+        subLine = `${ex.sets.length} set${range ? ` · ${range} kg` : ""}`;
+      } else if (active) {
+        const lastThis = ex.sets.at(-1) ?? null;
+        const prevLast = resolved.strip.prevSessionSets.at(-1) ?? null;
+        const w = lastThis?.weight ?? prevLast?.weight ?? resolved.target.weight;
+        const r = lastThis?.reps ?? prevLast?.reps ?? resolved.target.repsMin;
+        subLine = `${ex.sets.length}/${resolved.target.sets ?? "?"} set${
+          r != null || w != null
+            ? ` · sıradaki: ${r ?? "—"}${w != null ? ` @ ${formatNumber(w)}` : ""}`
+            : ""
+        }`;
+      } else {
+        subLine = [
+          resolved.target.sets != null
+            ? `${resolved.target.sets} × ${formatRepRange(resolved.target.repsMin, resolved.target.repsMax) ?? "—"}`
+            : (formatRepRange(resolved.target.repsMin, resolved.target.repsMax) ?? "—"),
+          formatRest(resolved.target.restSeconds),
+        ]
+          .filter(Boolean)
+          .join(" · ");
+      }
+      if (resolved.isSubstituted) subLine += " · muadil";
+      if (resolved.isAdded) subLine += " · eklendi";
+
+      return {
+        index: i,
+        name: resolved.name,
+        exerciseId: ex.exerciseId,
+        originalExerciseId: ex.substitute ? ex.substitute.originalExerciseId : null,
+        done,
+        active,
+        setsDone: ex.sets.length,
+        targetSets: resolved.target.sets,
+        subLine,
+        canSwap: !done && !active && ex.sets.length === 0 && !resolved.isAdded,
+        canRemove: resolved.isAdded && ex.sets.length === 0,
+      };
+    })
+    .filter((e): e is OverviewExercise => e != null);
+
+  const totals = sessionTotals(state.exercises);
+  const targetTotal = state.exercises.reduce(
+    (sum, ex, i) =>
+      sum + (resolveExercise(data, ex, i)?.target.sets ?? ex.sets.length),
+    0,
+  );
+
+  return (
+    <OverviewSheet
+      open={open}
+      onClose={onClose}
+      workoutName={data.workoutName}
+      timerLabel={timerLabel}
+      date={data.date}
+      exercises={exercises}
+      setTotals={{ done: totals.setCount, target: targetTotal }}
+      autoRest={player.autoRest}
+      soundHaptics={player.soundHaptics}
+      onAutoRest={player.setAutoRest}
+      onSoundHaptics={player.setSoundHaptics}
+      onJump={(i) => {
+        player.setActiveExercise(i);
+        onClose();
+      }}
+      onSubstitute={player.substituteExercise}
+      onAdd={player.addExercise}
+      onRemove={player.removeExercise}
+      onFinish={() => {
+        onClose();
+        player.goToSummary();
+      }}
+    />
   );
 }
 
@@ -569,19 +578,25 @@ function FinishView({
     };
   }, [synced, data.date, data.assignmentId]);
 
+  const resolvedName = useCallback(
+    (i: number) => resolveExercise(data, state.exercises[i], i)?.name ?? "Egzersiz",
+    [state.exercises, data],
+  );
+
   const exercises: SummaryExerciseDetail[] = state.exercises
     .map((ex, i) => {
-      const meta = data.exercises[i];
+      const strip = resolveExercise(data, ex, i)?.strip;
+      const prevWeights = strip?.prevSessionWeights ?? [];
       const sets = ex.sets.map((s, j) => {
-        const prevW = meta?.stats.prevSessionWeights[j];
+        const prevW = prevWeights[j];
         const deltaVsPrev =
           prevW != null && s.weight != null
             ? Math.round((s.weight - prevW) * 10) / 10
             : null;
         return { weight: s.weight, reps: s.reps, pr: s.pr, deltaVsPrev };
       });
-      const prevSetCount = meta?.stats.prevSessionSets.length ?? null;
-      return { name: meta?.name ?? "Egzersiz", sets, setCount: sets.length, prevSetCount };
+      const prevSetCount = strip ? strip.prevSessionSets.length : null;
+      return { name: resolvedName(i), sets, setCount: sets.length, prevSetCount };
     })
     .filter((e) => e.sets.length > 0);
 
@@ -592,7 +607,7 @@ function FinishView({
 
   const prExercises: SummaryExercise[] = state.exercises
     .map((ex, i) => ({
-      name: data.exercises[i]?.name ?? "Egzersiz",
+      name: resolvedName(i),
       prSets: ex.sets.filter((s) => s.pr).map((s) => ({ weight: s.weight, reps: s.reps })),
     }))
     .filter((e) => e.prSets.length > 0);
