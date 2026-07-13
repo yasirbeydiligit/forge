@@ -34,6 +34,24 @@ function baseAgg(overrides: Partial<PeriodAggregates> = {}): PeriodAggregates {
     protocolDue: 0,
     weeklyTargetDays: null,
     sparkSets: [],
+    setsPerSession: null,
+    avgRir: null,
+    prRegions: [],
+    muscleSets: [],
+    regionSets: [],
+    metricAvgs: {},
+    waterAvgMl: null,
+    waterDaysLogged: 0,
+    waterGoalDays: 0,
+    kcalAvg: null,
+    proteinAvg: null,
+    carbsAvg: null,
+    fatAvg: null,
+    kcalDaysOver: 0,
+    kcalDaysUnder: 0,
+    targetKcal: null,
+    targetProtein: null,
+    targetWaterMl: null,
     ...overrides,
   };
 }
@@ -78,7 +96,7 @@ describe("dürüstlük garantileri", () => {
     const f = facts.find((f) => f.type === "weight_trend");
     expect(f?.direction).toBe("positive");
     expect(f?.slots.deltaKg).toBe(1.2);
-    expect(f?.slots.direction).toBe("aldın");
+    expect(f?.slots.direction).toBe("artış");
     expect(cautions).toHaveLength(0);
   });
 
@@ -86,7 +104,7 @@ describe("dürüstlük garantileri", () => {
     const { facts } = extractFacts(input(weightDown, { goal: "fat_loss" }));
     const f = facts.find((f) => f.type === "weight_trend");
     expect(f?.direction).toBe("positive");
-    expect(f?.slots.direction).toBe("verdin");
+    expect(f?.slots.direction).toBe("düşüş");
   });
 
   it("goal null iken kilo değişimi nötr fact'tir (övgü yönü yok)", () => {

@@ -88,6 +88,17 @@ export function extractFacts(input: {
   const facts: Fact[] = [];
   const cautions: Caution[] = [];
 
+  // Fixed Turkish period words — safe to inflect since they are not dynamic.
+  const periodWord = { weekly: "hafta", monthly: "ay", milestone: "dönem" }[periodType];
+  const periodGen = { weekly: "haftanın", monthly: "ayın", milestone: "dönemin" }[periodType];
+  const cap = (w: string) => w.charAt(0).toLocaleUpperCase("tr-TR") + w.slice(1);
+  const periodSlots = {
+    period: periodWord,
+    periodCap: cap(periodWord),
+    periodGen,
+    periodGenCap: cap(periodGen),
+  };
+
   // ---- PRs ----
   if (cur.prCount > 0 && cur.bestPr) {
     facts.push({
@@ -95,6 +106,7 @@ export function extractFacts(input: {
       score: SCORE.pr_count + Math.min(cur.prCount, 10) * 6,
       direction: "positive",
       slots: {
+        ...periodSlots,
         count: cur.prCount,
         exercise: cur.bestPr.exercise,
         weight: cur.bestPr.weight,
@@ -113,8 +125,9 @@ export function extractFacts(input: {
     const abs = Math.abs(delta);
     const boost = periodType === "milestone" ? MILESTONE_WEIGHT_BOOST : 1;
     const slots = {
+      ...periodSlots,
       deltaKg: abs,
-      direction: delta < 0 ? "verdin" : "aldın",
+      direction: delta < 0 ? "düşüş" : "artış",
       from: round1(cur.weightFirst),
       to: round1(cur.weightLast),
     };
@@ -124,7 +137,7 @@ export function extractFacts(input: {
           type: "weight_trend",
           score: SCORE.weight_trend * boost,
           direction: "positive",
-          slots: { ...slots, direction: "korudun", deltaKg: abs },
+          slots: { ...slots, direction: "korundu", deltaKg: abs },
         });
       } else {
         cautions.push({
@@ -166,7 +179,7 @@ export function extractFacts(input: {
         type: "consistency",
         score: SCORE.consistency + Math.min(ratio, 1.2) * 20,
         direction: "positive",
-        slots: { sessions: cur.sessionsCompleted, planned },
+        slots: { ...periodSlots, sessions: cur.sessionsCompleted, planned },
         fill: Math.min(ratio, 1),
       });
     }
@@ -179,7 +192,7 @@ export function extractFacts(input: {
       type: "volume_trend",
       score: SCORE.volume_trend + Math.min(percent, 50) / 2,
       direction: "positive",
-      slots: { percent, sets: cur.totalSets },
+      slots: { ...periodSlots, percent, sets: cur.totalSets },
     });
   }
 
@@ -191,7 +204,7 @@ export function extractFacts(input: {
         type: "protein_consistency",
         score: SCORE.protein_consistency + ratio * 15,
         direction: "positive",
-        slots: { hit: cur.proteinDaysHit, logged: cur.nutritionDaysLogged },
+        slots: { ...periodSlots, hit: cur.proteinDaysHit, logged: cur.nutritionDaysLogged },
         fill: ratio,
       });
     } else if (ratio < 0.5) {
@@ -211,7 +224,7 @@ export function extractFacts(input: {
         type: "sleep_improvement",
         score: SCORE.sleep_improvement + delta * 10,
         direction: "positive",
-        slots: { delta, avg: round1(cur.sleepAvg) },
+        slots: { ...periodSlots, delta, avg: round1(cur.sleepAvg) },
       });
     } else if (delta <= -SLEEP_DECLINE_MIN_H) {
       cautions.push({
@@ -228,7 +241,7 @@ export function extractFacts(input: {
       type: "steps_avg",
       score: SCORE.steps_avg + Math.min(cur.stepsAvg / 1000, 15),
       direction: "positive",
-      slots: { avg: cur.stepsAvg },
+      slots: { ...periodSlots, avg: cur.stepsAvg },
     });
   }
 
@@ -241,6 +254,7 @@ export function extractFacts(input: {
       score: SCORE.cardio_total + Math.min(cur.cardioMinutes / 30, 20),
       direction: "positive",
       slots: {
+        ...periodSlots,
         minutes: cur.cardioMinutes,
         count: cur.cardioCount,
         distance: round1(cur.cardioDistanceKm),
@@ -256,7 +270,7 @@ export function extractFacts(input: {
         type: "protocol_adherence",
         score: SCORE.protocol_adherence + ratio * 10,
         direction: "positive",
-        slots: { done: cur.protocolDone, due: cur.protocolDue },
+        slots: { ...periodSlots, done: cur.protocolDone, due: cur.protocolDue },
         fill: Math.min(ratio, 1),
       });
     }
@@ -268,7 +282,7 @@ export function extractFacts(input: {
       type: "new_exercises",
       score: SCORE.new_exercises + Math.min(cur.newExercises.length, 5) * 3,
       direction: "positive",
-      slots: { count: cur.newExercises.length, first: cur.newExercises[0] },
+      slots: { ...periodSlots, count: cur.newExercises.length, first: cur.newExercises[0] },
     });
   }
 
@@ -278,7 +292,7 @@ export function extractFacts(input: {
       type: "best_session",
       score: SCORE.best_session,
       direction: "positive",
-      slots: { date: cur.bestSession.date, sets: cur.bestSession.sets },
+      slots: { ...periodSlots, date: cur.bestSession.date, sets: cur.bestSession.sets },
     });
   }
 
