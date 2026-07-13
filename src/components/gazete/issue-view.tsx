@@ -26,6 +26,7 @@ import { ScrollReveal } from "@/components/landing/scroll-reveal";
 import { PaperCard } from "@/components/lab/lab";
 import { differenceInCalendarDays } from "date-fns";
 import type { IssuePayload } from "@/lib/gazete/build-issue";
+import { trNum } from "@/lib/gazete/copy";
 import { formatNumber, parseDateKey } from "@/lib/format";
 import { periodLabel, type Period } from "@/lib/gazete/periods";
 import { cn } from "@/lib/utils";
@@ -245,35 +246,27 @@ export function IssueView({
         </ScrollReveal>
       ) : null}
 
-      {/* Rakamlarla Bu Dönem */}
-      {payload.statTable.length > 0 ? (
+      {/* Bölüm: ANTRENMAN */}
+      {payload.sections.antrenman ? (
         <ScrollReveal className="mt-10">
-          <h2 className="border-b-2 border-lab-ink/80 pb-1 font-mono text-xs font-bold uppercase tracking-[0.15em] text-lab-ink">
-            Rakamlarla Bu Dönem
-          </h2>
-          <dl className="divide-y divide-paper-border font-mono text-sm">
-            {payload.statTable.map((row) => (
-              <div key={row.label} className="flex items-baseline justify-between gap-4 py-2.5">
-                <dt className="text-muted-foreground">{row.label}</dt>
-                <dd className="flex items-baseline gap-2 text-lab-ink">
-                  {row.value}
-                  {row.delta ? (
-                    <span
-                      aria-label={
-                        row.delta === "up" ? "önceki döneme göre arttı" : row.delta === "down" ? "önceki döneme göre azaldı" : "değişmedi"
-                      }
-                      className={cn(
-                        "text-xs",
-                        row.delta === "up" ? "text-primary" : "text-muted-foreground",
-                      )}
-                    >
-                      {DELTA_GLYPH[row.delta]}
-                    </span>
-                  ) : null}
-                </dd>
-              </div>
-            ))}
-          </dl>
+          <SectionRule title="Antrenman" />
+          <AntrenmanSection data={payload.sections.antrenman} />
+        </ScrollReveal>
+      ) : null}
+
+      {/* Bölüm: BESLENME */}
+      {payload.sections.beslenme ? (
+        <ScrollReveal className="mt-10">
+          <SectionRule title="Beslenme" />
+          <BeslenmeSection data={payload.sections.beslenme} />
+        </ScrollReveal>
+      ) : null}
+
+      {/* Bölüm: TAKİP */}
+      {payload.sections.takip ? (
+        <ScrollReveal className="mt-10">
+          <SectionRule title="Takip" />
+          <TakipSection data={payload.sections.takip} />
         </ScrollReveal>
       ) : null}
 
@@ -320,5 +313,303 @@ export function IssueView({
         ) : null}
       </footer>
     </article>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Gazete bölümleri — mono veri sayfaları                                    */
+/* -------------------------------------------------------------------------- */
+
+type Sections = IssuePayload["sections"];
+
+function SectionRule({ title }: { title: string }) {
+  return (
+    <h2 className="mb-4 border-b-2 border-lab-ink/80 pb-1 font-mono text-xs font-bold uppercase tracking-[0.15em] text-lab-ink">
+      {title}
+    </h2>
+  );
+}
+
+/** Big serif number over a mono caption — the section's headline figures. */
+function MiniStat({ value, label }: { value: string; label: string }) {
+  return (
+    <div>
+      <p className="font-serif text-3xl font-medium tracking-tight text-lab-ink">{value}</p>
+      <p className="mt-0.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+        {label}
+      </p>
+    </div>
+  );
+}
+
+/** Mono count table with a thin proportional bar per row (max = 100%). */
+function CountTable({
+  caption,
+  rows,
+  unit,
+}: {
+  caption: string;
+  rows: { name: string; count: number }[];
+  unit: string;
+}) {
+  const max = Math.max(...rows.map((r) => r.count), 1);
+  return (
+    <div>
+      <p className="mb-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
+        {caption}
+      </p>
+      <dl className="space-y-1.5">
+        {rows.map((r) => (
+          <div key={r.name} className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3">
+            <div className="min-w-0">
+              <div className="flex items-baseline justify-between gap-2">
+                <dt className="truncate font-mono text-xs text-foreground/85">{r.name}</dt>
+              </div>
+              <div className="mt-0.5 h-1 overflow-hidden rounded-full bg-muted">
+                <div
+                  data-issue-fill
+                  className="h-full rounded-full bg-primary/70"
+                  style={{ width: `${Math.round((r.count / max) * 100)}%` }}
+                />
+              </div>
+            </div>
+            <dd className="font-mono text-xs tabular-nums text-lab-ink">
+              {r.count} {unit}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
+function AntrenmanSection({ data }: { data: NonNullable<Sections["antrenman"]> }) {
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <MiniStat value={String(data.sessions)} label="antrenman" />
+        <MiniStat value={String(data.totalSets)} label="toplam set" />
+        {data.setsPerSession != null ? (
+          <MiniStat value={trNum(data.setsPerSession)} label="set / seans" />
+        ) : null}
+        {data.avgRir != null ? (
+          <MiniStat value={trNum(data.avgRir)} label="ort. RIR" />
+        ) : null}
+      </div>
+
+      {data.prTotal > 0 ? (
+        <div className="rounded-lg border border-paper-border bg-paper p-4 paper-shadow">
+          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-primary">
+            Rekor panosu
+          </p>
+          <div className="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1">
+            <span className="font-serif text-2xl font-medium text-lab-ink">
+              {data.prTotal} rekor
+            </span>
+            {data.bestPr ? (
+              <span className="font-mono text-xs text-muted-foreground">
+                en iyisi: {data.bestPr.exercise} {trNum(data.bestPr.weight)} kg ×{" "}
+                {data.bestPr.reps}
+              </span>
+            ) : null}
+          </div>
+          {data.prRegions.length > 0 ? (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {data.prRegions.map((r) => (
+                <span
+                  key={r.region}
+                  className="rounded-full border border-primary/30 bg-primary/5 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-primary"
+                >
+                  {r.region} ×{r.count}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {data.topMuscle ? (
+        <p className="border-l-2 border-lab-amber pl-3 font-mono text-xs text-foreground/85">
+          <span className="font-bold uppercase tracking-wider text-lab-amber">
+            Kapak kası:
+          </span>{" "}
+          {data.topMuscle.muscle} — {data.topMuscle.sets} setle dönemin en çok
+          çalışılan kası.
+        </p>
+      ) : null}
+
+      {data.muscleSets.length > 0 || data.regionSets.length > 0 ? (
+        <div className="grid gap-6 md:grid-cols-2">
+          {data.muscleSets.length > 0 ? (
+            <CountTable
+              caption="Kas bazında set"
+              rows={data.muscleSets.map((m) => ({ name: m.muscle, count: m.sets }))}
+              unit="set"
+            />
+          ) : null}
+          {data.regionSets.length > 0 ? (
+            <CountTable
+              caption="Bölge bazında set"
+              rows={data.regionSets.map((r) => ({ name: r.region, count: r.sets }))}
+              unit="set"
+            />
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function BeslenmeSection({ data }: { data: NonNullable<Sections["beslenme"]> }) {
+  return (
+    <div className="space-y-5">
+      {data.kcal ? (
+        <div>
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <span className="font-serif text-3xl font-medium tracking-tight text-lab-ink">
+              {formatNumber(data.kcal.avg)} kcal
+            </span>
+            <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+              günlük ortalama{data.kcal.target != null ? ` · hedef ${formatNumber(data.kcal.target)}` : ""}
+              {" · "}
+              {data.daysLogged} gün kayıt
+            </span>
+          </div>
+          {data.kcal.target != null ? (
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {[
+                { label: "hedef aralığında", value: data.kcal.inBand, tone: "primary" },
+                { label: "üstünde", value: data.kcal.over, tone: "muted" },
+                { label: "altında", value: data.kcal.under, tone: "muted" },
+              ].map((tile) => (
+                <div
+                  key={tile.label}
+                  className={cn(
+                    "rounded-lg border px-3 py-2 text-center",
+                    tile.tone === "primary"
+                      ? "border-primary/30 bg-primary/5"
+                      : "border-paper-border bg-paper",
+                  )}
+                >
+                  <p
+                    className={cn(
+                      "font-serif text-xl font-medium",
+                      tile.tone === "primary" ? "text-primary" : "text-lab-ink",
+                    )}
+                  >
+                    {tile.value}
+                  </p>
+                  <p className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
+                    gün {tile.label}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {data.macros ? (
+        <dl className="grid grid-cols-3 gap-2 border-t border-paper-border pt-4">
+          {[
+            { label: "protein", value: data.macros.proteinAvg, target: data.macros.proteinTarget },
+            { label: "karbonhidrat", value: data.macros.carbsAvg, target: null },
+            { label: "yağ", value: data.macros.fatAvg, target: null },
+          ].map((m) =>
+            m.value != null ? (
+              <div key={m.label}>
+                <dd className="font-serif text-xl font-medium text-lab-ink">
+                  {formatNumber(m.value)} g
+                </dd>
+                <dt className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                  ort. {m.label}
+                  {m.target != null ? ` / ${formatNumber(m.target)}` : ""}
+                </dt>
+              </div>
+            ) : null,
+          )}
+        </dl>
+      ) : null}
+
+      {data.protocol ? (
+        <div className="border-t border-paper-border pt-4">
+          <div className="flex items-baseline justify-between font-mono text-xs">
+            <span className="text-muted-foreground">Protokol uygulaması</span>
+            <span className="tabular-nums text-lab-ink">
+              {data.protocol.done}/{data.protocol.due}
+            </span>
+          </div>
+          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
+            <div
+              data-issue-fill
+              className="h-full rounded-full bg-primary"
+              style={{
+                width: `${Math.round((data.protocol.done / Math.max(data.protocol.due, 1)) * 100)}%`,
+              }}
+            />
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function TakipSection({ data }: { data: NonNullable<Sections["takip"]> }) {
+  return (
+    <div className="space-y-4">
+      {data.metrics.length > 0 ? (
+        <dl className="divide-y divide-paper-border font-mono text-sm">
+          {data.metrics.map((m) => (
+            <div key={m.key} className="flex items-baseline justify-between gap-4 py-2">
+              <dt className="text-muted-foreground">{m.label}</dt>
+              <dd className="flex items-baseline gap-2 tabular-nums text-lab-ink">
+                {m.avg}
+                {m.unit ? <span className="text-xs text-muted-foreground">{m.unit}</span> : null}
+                {m.trend ? (
+                  <span
+                    aria-label={
+                      m.trend === "up"
+                        ? "önceki döneme göre arttı"
+                        : m.trend === "down"
+                          ? "önceki döneme göre azaldı"
+                          : "değişmedi"
+                    }
+                    className={cn(
+                      "w-3 text-xs",
+                      m.better ? "text-primary" : "text-muted-foreground",
+                    )}
+                  >
+                    {DELTA_GLYPH[m.trend]}
+                  </span>
+                ) : (
+                  <span aria-hidden className="w-3" />
+                )}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
+
+      {data.water || data.cardio ? (
+        <div className="grid gap-2 border-t border-paper-border pt-4 sm:grid-cols-2">
+          {data.water ? (
+            <p className="font-mono text-xs text-foreground/85">
+              <span className="font-bold uppercase tracking-wider text-lab-blue">Su</span>{" "}
+              ort. {formatNumber(data.water.avgMl)} ml
+              {data.water.goalMl != null
+                ? ` · hedefe ulaşan gün ${data.water.goalDays}/${data.water.daysLogged}`
+                : ""}
+            </p>
+          ) : null}
+          {data.cardio ? (
+            <p className="font-mono text-xs text-foreground/85">
+              <span className="font-bold uppercase tracking-wider text-lab-blue">Kardiyo</span>{" "}
+              {data.cardio.count} seans · {data.cardio.minutes} dk
+              {data.cardio.distanceKm > 0 ? ` · ${trNum(data.cardio.distanceKm)} km` : ""}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
   );
 }
