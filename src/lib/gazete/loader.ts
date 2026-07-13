@@ -68,14 +68,39 @@ export async function loadJourneyStart(
   return candidates.sort()[0];
 }
 
+type SetTargetRow = {
+  role: "primary" | "secondary";
+  muscle_functions: {
+    muscles: { slug: string; name_tr: string } | null;
+  } | null;
+};
+
 type SetRow = {
   session_id: string;
   exercise_id: string;
   weight: number | null;
   reps: number | null;
   rir: number | null;
-  exercise: { name: string } | null;
+  exercise: {
+    name: string;
+    region: string | null;
+    exercise_muscle_targets: SetTargetRow[];
+  } | null;
 };
+
+/** Same taxonomy join the coach weekly loader uses — numbers must agree. */
+const SET_SELECT =
+  "session_id, exercise_id, weight, reps, rir, exercise:exercises(name, region, exercise_muscle_targets(role, muscle_functions(muscles(slug, name_tr))))";
+
+function toMuscles(rows: SetTargetRow[]) {
+  const out: { slug: string; nameTr: string; role: "primary" | "secondary" }[] = [];
+  for (const t of rows) {
+    const muscle = t.muscle_functions?.muscles;
+    if (!muscle) continue;
+    out.push({ slug: muscle.slug, nameTr: muscle.name_tr, role: t.role });
+  }
+  return out;
+}
 
 /** Fetch one period's raw rows. `light` skips PR/new-exercise history (used
  *  for the previous-period comparator, which never reports PRs). */
@@ -103,19 +128,21 @@ async function loadAggregateRows(
       .lte("session_date", period.end),
     supabase
       .from("daily_metrics")
-      .select("metric_date, weight, sleep_hours, steps")
+      .select(
+        "metric_date, weight, sleep_hours, resting_hr, energy, hunger, adherence, digestion, steps, water_ml",
+      )
       .eq("athlete_id", athleteId)
       .gte("metric_date", period.start)
       .lte("metric_date", period.end),
     supabase
       .from("meals")
-      .select("meal_date, kcal, protein")
+      .select("meal_date, kcal, protein, carbs, fat")
       .eq("athlete_id", athleteId)
       .gte("meal_date", period.start)
       .lte("meal_date", period.end),
     supabase
       .from("nutrition_targets")
-      .select("kcal, protein")
+      .select("kcal, protein, carbs, fat, water_ml")
       .eq("athlete_id", athleteId)
       .maybeSingle(),
     supabase
@@ -153,7 +180,7 @@ async function loadAggregateRows(
   if (sessionIds.length > 0) {
     const { data: rawSets } = await supabase
       .from("log_sets")
-      .select("session_id, exercise_id, weight, reps, rir, exercise:exercises(name)")
+      .select(SET_SELECT)
       .in("session_id", sessionIds);
     sets = ((rawSets ?? []) as unknown as SetRow[]).map((r) => ({
       sessionId: r.session_id,
@@ -163,6 +190,8 @@ async function loadAggregateRows(
       weight: r.weight != null ? Number(r.weight) : null,
       reps: r.reps,
       rir: r.rir != null ? Number(r.rir) : null,
+      region: r.exercise?.region ?? null,
+      muscles: toMuscles(r.exercise?.exercise_muscle_targets ?? []),
     }));
   }
 
@@ -183,7 +212,7 @@ async function loadAggregateRows(
       supabase
         .from("log_sets")
         .select(
-          "exercise_id, weight, reps, rir, exercise:exercises(name), session:log_sessions!inner(athlete_id, session_date)",
+          "exercise_id, weight, reps, rir, exercise:exercises(name, region), session:log_sessions!inner(athlete_id, session_date)",
         )
         .eq("log_sessions.athlete_id", athleteId)
         .gte("log_sessions.session_date", historyStart)
@@ -196,12 +225,20 @@ async function loadAggregateRows(
       ((priorExercises ?? []) as PriorRow[]).map((r) => r.exercise_id),
     );
 
-    type PrRow = SetRow & { session: { session_date: string } | null };
+    type PrRow = {
+      exercise_id: string;
+      weight: number | null;
+      reps: number | null;
+      rir: number | null;
+      exercise: { name: string; region: string | null } | null;
+      session: { session_date: string } | null;
+    };
     prHistorySets = ((prRows ?? []) as unknown as PrRow[])
       .filter((r) => r.session != null)
       .map((r) => ({
         exerciseId: r.exercise_id,
         exerciseName: r.exercise?.name ?? "Egzersiz",
+        region: r.exercise?.region ?? null,
         date: r.session!.session_date,
         weight: r.weight != null ? Number(r.weight) : null,
         reps: r.reps,
@@ -210,11 +247,17 @@ async function loadAggregateRows(
   }
 
   // Per-day nutrition totals.
-  const mealDayMap = new Map<string, { kcal: number; protein: number }>();
+  const mealDayMap = new Map<
+    string,
+    { kcal: number; protein: number; carbs: number; fat: number }
+  >();
   for (const m of meals ?? []) {
-    const day = mealDayMap.get(m.meal_date) ?? { kcal: 0, protein: 0 };
+    const day =
+      mealDayMap.get(m.meal_date) ?? { kcal: 0, protein: 0, carbs: 0, fat: 0 };
     day.kcal += m.kcal ?? 0;
     day.protein += m.protein ?? 0;
+    day.carbs += m.carbs ?? 0;
+    day.fat += m.fat ?? 0;
     mealDayMap.set(m.meal_date, day);
   }
 
@@ -236,10 +279,24 @@ async function loadAggregateRows(
       date: m.metric_date,
       weight: m.weight != null ? Number(m.weight) : null,
       sleepHours: m.sleep_hours != null ? Number(m.sleep_hours) : null,
+      restingHr: m.resting_hr,
+      energy: m.energy,
+      hunger: m.hunger,
+      adherence: m.adherence,
+      digestion: m.digestion,
       steps: m.steps,
+      waterMl: m.water_ml,
     })),
     mealDays: [...mealDayMap.entries()].map(([date, v]) => ({ date, ...v })),
-    target: target ? { kcal: target.kcal, protein: target.protein } : null,
+    target: target
+      ? {
+          kcal: target.kcal,
+          protein: target.protein,
+          carbs: target.carbs,
+          fat: target.fat,
+          waterMl: target.water_ml,
+        }
+      : null,
     cardio: (cardio ?? []).map((c) => ({
       minutes: c.duration_min,
       distanceKm: c.distance_km != null ? Number(c.distance_km) : null,

@@ -84,12 +84,41 @@ function richInput() {
       protocolDue: 14,
       weeklyTargetDays: 4,
       sparkSets: [8, 0, 22, 0, 15, 0, 0],
+      setsPerSession: 15.5,
+      avgRir: 2.1,
+      prRegions: [
+        { region: "Üst Göğüs", count: 2 },
+        { region: "Sırt Orta", count: 1 },
+      ],
+      muscleSets: [
+        { muscle: "Göğüs", sets: 18 },
+        { muscle: "Kanat", sets: 14 },
+        { muscle: "Quadriceps", sets: 12 },
+      ],
+      regionSets: [
+        { region: "Üst Göğüs", sets: 12 },
+        { region: "Sırt Orta", sets: 10 },
+      ],
+      metricAvgs: { weight: 71.6, sleep_hours: 7.6, energy: 8, steps: 9500 },
+      waterAvgMl: 2800,
+      waterDaysLogged: 6,
+      waterGoalDays: 4,
+      kcalAvg: 2450,
+      proteinAvg: 158,
+      carbsAvg: 260,
+      fatAvg: 78,
+      kcalDaysOver: 1,
+      kcalDaysUnder: 1,
+      targetKcal: 2500,
+      targetProtein: 150,
+      targetWaterMl: 3000,
     }),
     previous: agg({
       sleepAvg: 7.1,
       totalSets: 50,
       sessionsCompleted: 3,
-    }),
+      metricAvgs: { weight: 71.0, sleep_hours: 7.1, energy: 8.1, steps: 8000 },
+    }) as PeriodAggregates | null,
   };
 }
 
@@ -114,7 +143,7 @@ describe("buildIssue — boş dönem", () => {
     expect(payload).not.toBeNull();
     expect(payload!.headline.factType).toBe("neutral");
     expect(payload!.stories).toHaveLength(0);
-    expect(payload!.statTable.length).toBeGreaterThan(0);
+    expect(payload!.sections.antrenman?.totalSets).toBe(8);
   });
 });
 
@@ -133,22 +162,79 @@ describe("buildIssue — zengin dönem", () => {
     expect(payload.lead.stat).not.toBeNull();
   });
 
-  it("statTable verisi olan satırları içerir, delta previous'a göre", () => {
-    const payload = buildIssue(ctx, richInput())!;
-    const labels = payload.statTable.map((r) => r.label);
-    expect(labels).toContain("Toplam set");
-    const sets = payload.statTable.find((r) => r.label === "Toplam set")!;
-    expect(sets.value).toBe("62");
-    expect(sets.delta).toBe("up"); // 62 > 50
+  it("ANTRENMAN bölümü: totaller, kapak kası, kas/bölge tabloları, PR bölgeleri", () => {
+    const a = buildIssue(ctx, richInput())!.sections.antrenman!;
+    expect(a.sessions).toBe(4);
+    expect(a.totalSets).toBe(62);
+    expect(a.setsPerSession).toBe(15.5);
+    expect(a.avgRir).toBe(2.1);
+    expect(a.prTotal).toBe(3);
+    expect(a.topMuscle).toEqual({ muscle: "Göğüs", sets: 18 });
+    expect(a.muscleSets[0]).toEqual({ muscle: "Göğüs", sets: 18 });
+    expect(a.regionSets).toHaveLength(2);
+    expect(a.prRegions[0]).toEqual({ region: "Üst Göğüs", count: 2 });
   });
 
-  it("kardiyo 0 ise satırı yok", () => {
+  it("kas tablosunun uzun kuyruğu 'Diğer' satırına katlanır", () => {
+    const input = richInput();
+    input.current.muscleSets = Array.from({ length: 12 }, (_, i) => ({
+      muscle: `Kas${i}`,
+      sets: 12 - i,
+    }));
+    const a = buildIssue(ctx, input)!.sections.antrenman!;
+    expect(a.muscleSets).toHaveLength(8);
+    expect(a.muscleSets[7].muscle).toBe("Diğer");
+    expect(a.muscleSets[7].sets).toBe(5 + 4 + 3 + 2 + 1); // katlanan 5 satırın toplamı
+  });
+
+  it("BESLENME bölümü: kcal ortalama/hedef/bant günleri + makrolar + protokol", () => {
+    const b = buildIssue(ctx, richInput())!.sections.beslenme!;
+    expect(b.kcal).toEqual({ avg: 2450, target: 2500, inBand: 5, over: 1, under: 1 });
+    expect(b.macros).toEqual({ proteinAvg: 158, carbsAvg: 260, fatAvg: 78, proteinTarget: 150 });
+    expect(b.protocol).toEqual({ done: 13, due: 14 });
+  });
+
+  it("TAKİP bölümü: metrik ortalamaları + trend + polarite; su ve kardiyo", () => {
+    const t = buildIssue(ctx, richInput())!.sections.takip!;
+    const byKey = Object.fromEntries(t.metrics.map((m) => [m.key, m]));
+    // muscle_gain hedefi: kilo artışı iyidir
+    expect(byKey.weight.trend).toBe("up");
+    expect(byKey.weight.better).toBe(true);
+    // uyku yükseldi → iyi
+    expect(byKey.sleep_hours.trend).toBe("up");
+    expect(byKey.sleep_hours.better).toBe(true);
+    // enerji 8 vs 8.1 → epsilon içinde flat
+    expect(byKey.energy.trend).toBe("flat");
+    expect(byKey.energy.better).toBeNull();
+    expect(byKey.steps.trend).toBe("up");
+    expect(t.water).toEqual({ avgMl: 2800, goalMl: 3000, goalDays: 4, daysLogged: 6 });
+    expect(t.cardio).toEqual({ count: 3, minutes: 95, distanceKm: 12.4 });
+  });
+
+  it("previous yokken trendler null; veri yoksa bölüm null", () => {
+    const input = richInput();
+    input.previous = null;
+    const t = buildIssue(ctx, input)!.sections.takip!;
+    expect(t.metrics.every((m) => m.trend === null)).toBe(true);
+
+    const empty = buildIssue(ctx, {
+      goal: null,
+      periodType: "weekly",
+      current: agg({ sessionsCompleted: 1, totalSets: 8 }),
+      previous: null,
+    })!;
+    expect(empty.sections.beslenme).toBeNull();
+    expect(empty.sections.takip).toBeNull();
+    expect(empty.sections.antrenman).not.toBeNull();
+  });
+
+  it("kardiyo 0 ise takip.cardio null", () => {
     const input = richInput();
     input.current.cardioMinutes = 0;
     input.current.cardioCount = 0;
     input.current.cardioDistanceKm = 0;
     const payload = buildIssue(ctx, input)!;
-    expect(payload.statTable.map((r) => r.label)).not.toContain("Kardiyo");
+    expect(payload.sections.takip!.cardio).toBeNull();
   });
 
   it("editorNotes en fazla 2, şiddet sırasına göre", () => {
@@ -170,7 +256,7 @@ describe("buildIssue — zengin dönem", () => {
 
   it("farklı seed farklı sayı kimliği üretebilir ama yapı geçerli kalır", () => {
     const other = buildIssue({ ...ctx, seed: "ath1:weekly:2026-07-12" }, richInput())!;
-    expect(other.v).toBe(1);
+    expect(other.v).toBe(2);
     expect(typeof other.headline.title).toBe("string");
   });
 
