@@ -7,6 +7,7 @@ import {
   HEADLINES,
   NEUTRAL_HEADLINES,
   pickVariant,
+  renderTemplate,
   STORY_BODIES,
   type Template,
 } from "./copy";
@@ -59,6 +60,43 @@ describe("pickVariant — deterministik çeşitlilik", () => {
       Array.from({ length: 20 }, (_, i) => pickVariant(pool, `seed-${i}`)),
     );
     expect(seen.size).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("renderTemplate — sayıya duyarlı seçim", () => {
+  it("tek PR'da tekil şablon, çok PR'da çoğul şablon seçilir", () => {
+    const single = renderTemplate(
+      HEADLINES.pr_count,
+      { count: 1, exercise: "Bench Press", weight: 70, reps: 7, period: "hafta" },
+      "seed-a",
+    );
+    expect(single).not.toBeNull();
+    expect(single).not.toContain("1 kişisel rekor"); // "Bu hafta 1 kişisel rekor" asla
+    const multi = renderTemplate(
+      HEADLINES.pr_count,
+      { count: 4, exercise: "Bench Press", weight: 70, reps: 7, period: "hafta" },
+      "seed-a",
+    );
+    expect(multi).not.toBeNull();
+    expect(multi).toMatch(/4/);
+  });
+
+  it("hiçbir şablon uymuyorsa null döner", () => {
+    expect(renderTemplate([{ text: "x", slots: [], match: () => false }], {}, "s")).toBeNull();
+  });
+});
+
+describe("Türkçe dil kuralları", () => {
+  it("hiçbir şablon dinamik slota kesme işaretiyle ek getirmez ({slot}'x yasak)", () => {
+    const all: Template[] = [
+      ...Object.values(HEADLINES).flat(),
+      ...Object.values(STORY_BODIES).flat(),
+      ...Object.values(EDITOR_NOTES).flat(),
+      ...NEUTRAL_HEADLINES,
+    ];
+    for (const tpl of all) {
+      expect(tpl.text, tpl.text).not.toMatch(/\{\w+\}'/);
+    }
   });
 });
 
@@ -183,11 +221,19 @@ describe("havuz bütünlüğü — her fact tipi konuşabilmeli", () => {
     });
     expect(facts.length).toBeGreaterThanOrEqual(8);
     for (const fact of facts) {
+      // Her havuzdan en az bir uygun şablon gerçek slotlarla dolmalı…
+      expect(
+        renderTemplate(HEADLINES[fact.type], fact.slots, "e2e"),
+        `HEADLINES.${fact.type}`,
+      ).not.toBeNull();
+      expect(
+        renderTemplate(STORY_BODIES[fact.type], fact.slots, "e2e"),
+        `STORY_BODIES.${fact.type}`,
+      ).not.toBeNull();
+      // …ve uygun (match geçen) HER şablon eksiksiz dolmalı.
       for (const tpl of [...HEADLINES[fact.type], ...STORY_BODIES[fact.type]]) {
-        expect(
-          fillTemplate(tpl, fact.slots),
-          `${fact.type}: "${tpl.text}"`,
-        ).not.toBeNull();
+        if (tpl.match && !tpl.match(fact.slots)) continue;
+        expect(fillTemplate(tpl, fact.slots), `${fact.type}: "${tpl.text}"`).not.toBeNull();
       }
     }
   });

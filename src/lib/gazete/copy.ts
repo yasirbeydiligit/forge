@@ -1,16 +1,29 @@
 /**
  * Forge Gazete copy engine — rule-based Turkish template pools.
  *
- * Every claim is data-bound: a template declares its required slots and
- * fillTemplate returns null when any is missing (and, as a double guard, when
- * any placeholder in the text can't be resolved) — a half sentence can never
- * be printed. Variant choice is a deterministic hash of the issue seed, so a
- * printed issue is reproducible while consecutive issues vary their voice.
- * Tone: newspaper, warm, no exaggeration — the numbers do the bragging.
+ * Voice: "gazete nötr" (user-approved 2026-07-13) — plain journalistic
+ * Turkish; the praise comes from the numbers, never from adjectives. Written
+ * as native Turkish, not translated English.
+ *
+ * Hard rules:
+ * - A template declares required slots; fillTemplate returns null when any is
+ *   missing (double-guarded against stray placeholders) — a half sentence can
+ *   never be printed.
+ * - NEVER attach a Turkish suffix to a dynamic slot value ({exercise}'te,
+ *   {sessions}'i…): vowel harmony breaks on unknown words/numbers. Suffixes
+ *   are allowed only on fixed words. Count/number-dependent phrasing is
+ *   handled with `match` predicates instead.
+ * - Variant choice is a deterministic hash of the issue seed, so a printed
+ *   issue is reproducible while consecutive issues vary their voice.
  */
 import type { Caution, FactType } from "./facts";
 
-export type Template = { text: string; slots: string[] };
+export type Template = {
+  text: string;
+  slots: string[];
+  /** Optional eligibility test (e.g. count === 1) evaluated on the fact slots. */
+  match?: (slots: Record<string, string | number>) => boolean;
+};
 
 /** djb2 — tiny, stable, good enough spread for variant picking. */
 function hash(seed: string): number {
@@ -49,218 +62,290 @@ export function fillTemplate(
   return missing ? null : text;
 }
 
+/** Pick a deterministic eligible variant and fill it; null if none fits. */
+export function renderTemplate(
+  pool: readonly Template[],
+  slots: Record<string, string | number>,
+  seed: string,
+): string | null {
+  const eligible = pool.filter((t) => !t.match || t.match(slots));
+  if (eligible.length === 0) return null;
+  return fillTemplate(pickVariant(eligible, seed), slots);
+}
+
+const one = (key: string) => (slots: Record<string, string | number>) =>
+  Number(slots[key]) === 1;
+const many = (key: string) => (slots: Record<string, string | number>) =>
+  Number(slots[key]) > 1;
+
 /* -------------------------------------------------------------------------- */
-/*  Manşetler — büyük serif punto, kısa ve vurucu                             */
+/*  Manşetler — kısa, kuru, rakam konuşur                                     */
 /* -------------------------------------------------------------------------- */
 
 export const HEADLINES: Record<FactType, Template[]> = {
   pr_count: [
-    { text: "Bu dönem {count} kez tarihe geçtin", slots: ["count"] },
-    { text: "{count} yeni rekor: çıta yükseldi", slots: ["count"] },
-    { text: "Rekor defterine {count} yeni satır", slots: ["count"] },
-    { text: "{exercise} konuştu: {weight} kg", slots: ["exercise", "weight"] },
+    {
+      text: "Yeni kişisel rekor: {exercise} {weight} kg",
+      slots: ["exercise", "weight"],
+      match: one("count"),
+    },
+    {
+      text: "Kişisel rekor tazelendi: {exercise} {weight} kg × {reps}",
+      slots: ["exercise", "weight", "reps"],
+      match: one("count"),
+    },
+    {
+      text: "Bu {period} {count} kişisel rekor kırıldı",
+      slots: ["period", "count"],
+      match: many("count"),
+    },
+    {
+      text: "Rekor tablosuna {count} yeni giriş",
+      slots: ["count"],
+      match: many("count"),
+    },
   ],
   weight_trend: [
-    { text: "{deltaKg} kg {direction}: plan işliyor", slots: ["deltaKg", "direction"] },
-    { text: "Terazi tarafını seçti: {deltaKg} kg {direction}", slots: ["deltaKg", "direction"] },
-    { text: "{from} → {to}: yön doğru", slots: ["from", "to"] },
+    {
+      text: "{periodGenCap} bilançosu: {deltaKg} kg {direction}",
+      slots: ["periodGenCap", "deltaKg", "direction"],
+      match: (s) => s.direction !== "korundu",
+    },
+    {
+      text: "Tartıda net sonuç: {deltaKg} kg {direction}",
+      slots: ["deltaKg", "direction"],
+      match: (s) => s.direction !== "korundu",
+    },
+    {
+      text: "Kilo hedeflenen aralıkta korundu: {from} → {to}",
+      slots: ["from", "to"],
+      match: (s) => s.direction === "korundu",
+    },
   ],
   consistency: [
-    { text: "Söz verdin, geldin: {sessions} antrenman", slots: ["sessions"] },
-    { text: "Program mı? İmza gibi: {sessions}/{planned} gün", slots: ["sessions", "planned"] },
-    { text: "Devamsızlık defterinde adın yok", slots: [] },
+    {
+      text: "Planlanan antrenmanların tamamı yapıldı: {sessions}/{planned}",
+      slots: ["sessions", "planned"],
+      match: (s) => s.sessions === s.planned,
+    },
+    {
+      text: "Program yüksek oranda uygulandı: {sessions}/{planned} antrenman",
+      slots: ["sessions", "planned"],
+      match: (s) => s.sessions !== s.planned,
+    },
+    {
+      text: "Devamlılık tablosu net: {sessions}/{planned} antrenman",
+      slots: ["sessions", "planned"],
+    },
   ],
   volume_trend: [
-    { text: "Hacim yüzde {percent} yukarı", slots: ["percent"] },
-    { text: "Daha çok demir kalktı: +%{percent}", slots: ["percent"] },
+    { text: "Antrenman hacmi yüzde {percent} arttı", slots: ["percent"] },
+    { text: "Hacimde artış: önceki döneme göre +%{percent}", slots: ["percent"] },
   ],
   protein_consistency: [
-    { text: "Protein hedefi: {hit}/{logged} gün tam isabet", slots: ["hit", "logged"] },
-    { text: "Mutfak da antrenmandaydı: {hit} gün protein tamam", slots: ["hit"] },
+    { text: "Protein hedefi {hit}/{logged} gün tutturuldu", slots: ["hit", "logged"] },
+    { text: "Beslenmede istikrar: {hit} gün protein hedefinde", slots: ["hit"] },
   ],
   sleep_improvement: [
-    { text: "Uyku +{delta} saat: en ucuz takviye işliyor", slots: ["delta"] },
-    { text: "Geceler uzadı: ortalama {avg} saat uyku", slots: ["avg"] },
+    { text: "Uyku ortalaması {avg} saate yükseldi", slots: ["avg"] },
+    { text: "Uykuda iyileşme: önceki döneme göre +{delta} saat", slots: ["delta"] },
   ],
   steps_avg: [
-    { text: "Günde {avg} adım: motor hep sıcak", slots: ["avg"] },
-    { text: "{avg} adım ortalama — şehir senin", slots: ["avg"] },
+    { text: "Günlük ortalama {avg} adım", slots: ["avg"] },
+    { text: "Adım ortalaması {avg} olarak kaydedildi", slots: ["avg"] },
   ],
   cardio_total: [
-    { text: "{minutes} dakika kardiyo hanene yazıldı", slots: ["minutes"] },
-    { text: "Nefes açık: {count} kardiyo, {minutes} dakika", slots: ["count", "minutes"] },
+    { text: "{minutes} dakika kardiyo tamamlandı", slots: ["minutes"] },
+    { text: "Kardiyo toplamı: {count} seans, {minutes} dakika", slots: ["count", "minutes"] },
   ],
   protocol_adherence: [
-    { text: "Protokol saati şaşmadı: {done}/{due}", slots: ["done", "due"] },
-    { text: "Detaylar da tamam: {done} protokol işlendi", slots: ["done"] },
+    { text: "Protokol uyumu yüksek: {done}/{due}", slots: ["done", "due"] },
+    { text: "Protokoller büyük ölçüde uygulandı: {done}/{due}", slots: ["done", "due"] },
   ],
   new_exercises: [
-    { text: "Repertuvara yeni hareket: {first}", slots: ["first"] },
-    { text: "{count} yeni hareket denendi — cesaret iyi şeydir", slots: ["count"] },
+    {
+      text: "Programa yeni bir hareket eklendi: {first}",
+      slots: ["first"],
+      match: one("count"),
+    },
+    {
+      text: "{count} yeni hareket denendi",
+      slots: ["count"],
+      match: many("count"),
+    },
   ],
   best_session: [
-    { text: "Haftanın maçı: {sets} setlik gün", slots: ["sets"] },
-    { text: "Bir gün vardı ki: {sets} set üst üste", slots: ["sets"] },
+    { text: "{periodGenCap} en yoğun antrenmanı: {sets} set", slots: ["periodGenCap", "sets"] },
+    { text: "Zirve gün: {sets} setlik antrenman", slots: ["sets"] },
   ],
 };
 
 /** Pozitif fact çıkmayan ama verisi olan dönem: dürüst, övgüsüz kapak. */
 export const NEUTRAL_HEADLINES: Template[] = [
-  { text: "Dönem kayıtları masada", slots: [] },
-  { text: "Defter işlendi: rakamlar içeride", slots: [] },
-  { text: "Bu sayı: veriler, sade ve net", slots: [] },
+  { text: "Dönem raporu hazır", slots: [] },
+  { text: "Kayıtlar işlendi, rapor masada", slots: [] },
+  { text: "Veriler derlendi", slots: [] },
 ];
 
 /* -------------------------------------------------------------------------- */
-/*  Hikâye gövdeleri — 1-2 cümle, veri merkezde                               */
+/*  Hikâye gövdeleri — 1-2 cümle, bilgi verir, süslemez                       */
 /* -------------------------------------------------------------------------- */
 
 export const STORY_BODIES: Record<FactType, Template[]> = {
   pr_count: [
     {
-      text: "En parlağı {exercise}: {weight} kg × {reps}. Geçmişteki her setini geride bıraktın.",
+      text: "En dikkat çekeni {exercise}: {weight} kg × {reps} — önceki tüm kayıtların üzerinde.",
       slots: ["exercise", "weight", "reps"],
     },
     {
-      text: "{count} rekorun zirvesi {exercise} — {weight} kg ile yeni kişisel sınırın.",
-      slots: ["count", "exercise", "weight"],
+      text: "Listenin başında {exercise} var: {weight} kg × {reps} ile kişisel en iyi.",
+      slots: ["exercise", "weight", "reps"],
     },
   ],
   weight_trend: [
     {
-      text: "Dönem başında {from} kg, sonunda {to} kg. Tartı günlük oynar; trend senden yana.",
+      text: "Dönem başı ortalaması {from} kg, dönem sonu {to} kg. Günlük dalgalanma normaldir; belirleyici olan eğilim.",
       slots: ["from", "to"],
+      match: (s) => s.direction !== "korundu",
     },
     {
-      text: "Net {deltaKg} kg {direction}. Bu, tesadüf değil — kayıtların toplamı.",
+      text: "Net değişim {deltaKg} kg, yönü {direction}. Kayıtlar düzenli olduğu için tablo güvenilir.",
       slots: ["deltaKg", "direction"],
+      match: (s) => s.direction !== "korundu",
+    },
+    {
+      text: "Başlangıç {from} kg, bitiş {to} kg — hedeflenen aralığın içinde kaldı.",
+      slots: ["from", "to"],
+      match: (s) => s.direction === "korundu",
     },
   ],
   consistency: [
     {
-      text: "{planned} planlanan günün {sessions} tanesi tamamlandı. Süreklilik, sonuçların annesidir.",
+      text: "Takvimde {planned} antrenman planlıydı; {sessions} antrenman tamamlandı.",
       slots: ["planned", "sessions"],
     },
     {
-      text: "Takvim {sessions} kez imzalandı. En zor kısım gelmekti; geldin.",
-      slots: ["sessions"],
+      text: "Devamlılık bu {period} da bozulmadı: {sessions}/{planned}.",
+      slots: ["period", "sessions", "planned"],
     },
   ],
   volume_trend: [
     {
-      text: "Toplam {sets} set işlendi — önceki döneme göre %{percent} artış.",
+      text: "Toplam {sets} set çalışıldı — önceki döneme göre yüzde {percent} artış.",
       slots: ["sets", "percent"],
     },
     {
-      text: "İş hacmi %{percent} büyüdü. Vücut, verilen işe uyum sağlar.",
+      text: "İş hacmi yüzde {percent} genişledi; adaptasyon için gereken uyaran yerinde.",
       slots: ["percent"],
     },
   ],
   protein_consistency: [
     {
-      text: "Kayıtlı {logged} günün {hit} tanesinde protein hedefin tamamdı.",
+      text: "Kayıt girilen {logged} günün {hit} gününde protein hedefi karşılandı.",
       slots: ["logged", "hit"],
     },
     {
-      text: "Protein {hit} gün yerinde. Kaslar sofrada yapılır, salonda çağrılır.",
+      text: "Protein alımı {hit} gün hedef aralığındaydı.",
       slots: ["hit"],
     },
   ],
   sleep_improvement: [
     {
-      text: "Uyku ortalaman {avg} saate çıktı (+{delta}). Toparlanma bütçen büyüdü.",
+      text: "Ortalama uyku {avg} saat; önceki döneme göre {delta} saat artış.",
       slots: ["avg", "delta"],
     },
     {
-      text: "+{delta} saat uyku — görünmeyen antrenman da iyi geçti.",
+      text: "Uyku süresi {delta} saat uzadı — toparlanma tarafı güçlendi.",
       slots: ["delta"],
     },
   ],
   steps_avg: [
     {
-      text: "Günlük ortalama {avg} adım. Temel aktivite sessizce iş görüyor.",
+      text: "Dönem ortalaması günde {avg} adım olarak kaydedildi.",
       slots: ["avg"],
     },
     {
-      text: "{avg} adım/gün — NEAT hanesi dolu.",
+      text: "Günlük aktivite {avg} adım seviyesinde seyretti.",
       slots: ["avg"],
     },
   ],
   cardio_total: [
     {
-      text: "{count} seansta {minutes} dakika kardiyo, {distance} km yol.",
+      text: "{count} seansta toplam {minutes} dakika kardiyo, {distance} km yol.",
       slots: ["count", "minutes", "distance"],
     },
     {
-      text: "Kondisyon hattı çalıştı: toplam {minutes} dakika.",
+      text: "Kardiyo hanesine {minutes} dakika işlendi.",
       slots: ["minutes"],
     },
   ],
   protocol_adherence: [
     {
-      text: "{due} protokolün {done} tanesi zamanında işlendi.",
+      text: "{due} protokol uygulamasından {done} tanesi zamanında işaretlendi.",
       slots: ["due", "done"],
     },
     {
-      text: "Küçük işler büyük fark yaratır: {done} protokol tamam.",
-      slots: ["done"],
+      text: "Protokol takibi düzenli ilerledi: {done}/{due}.",
+      slots: ["done", "due"],
     },
   ],
   new_exercises: [
     {
-      text: "İlk kez denenen {count} hareketin başında {first} var. Yeni uyaran, yeni adaptasyon.",
-      slots: ["count", "first"],
+      text: "İlk kez uygulandı: {first}. Yeni hareket, yeni uyaran demek.",
+      slots: ["first"],
+      match: one("count"),
     },
     {
-      text: "{first} artık repertuvarında.",
-      slots: ["first"],
+      text: "İlk kez uygulanan {count} hareketin başında {first} var.",
+      slots: ["count", "first"],
+      match: many("count"),
     },
   ],
   best_session: [
     {
-      text: "Dönemin zirve günü: {sets} set. O günkü sen, referans noktası.",
+      text: "En yoğun gün {sets} setle tamamlandı — dönemin referans antrenmanı.",
       slots: ["sets"],
     },
     {
-      text: "En dolu gün {sets} setle kapandı.",
+      text: "Tek antrenmanda {sets} set: dönemin zirvesi.",
       slots: ["sets"],
     },
   ],
 };
 
 /* -------------------------------------------------------------------------- */
-/*  Editörün Notu — nazik hatırlatma, asla azarlama                           */
+/*  Editörün Notu — nazik hatırlatma, suçlama yok                             */
 /* -------------------------------------------------------------------------- */
 
 export const EDITOR_NOTES: Record<Caution["type"], Template[]> = {
   weight_against_goal: [
     {
-      text: "Tartı bu dönem {deltaKg} kg ters yöne yazdı. Panik yok — koçun planla birlikte değerlendirecektir.",
+      text: "Kilo bu dönem hedefin tersine {deltaKg} kg değişti. Tek dönem eğilim sayılmaz; değerlendirme koçta.",
       slots: ["deltaKg"],
     },
     {
-      text: "Kilo hedefin aksine {deltaKg} kg oynadı; tek dönem trend değildir, koçunla konuşulacak konu.",
+      text: "Tartı hedefin aksi yönünde {deltaKg} kg gösterdi — koç haftalık takipte ele alacaktır.",
       slots: ["deltaKg"],
     },
   ],
   sleep_decline: [
     {
-      text: "Uyku ortalaman {delta} saat geriledi. Toparlanma bütçesi antrenman kadar değerli.",
+      text: "Uyku ortalaması {delta} saat geriledi. Toparlanma, antrenman kadar sonuç belirler.",
       slots: ["delta"],
     },
     {
-      text: "Geceler biraz kısaldı (-{delta} saat). Küçük bir düzen ayarı iyi gelebilir.",
+      text: "Uyku süresi bu dönem {delta} saat kısaldı — göz önünde tutmakta fayda var.",
       slots: ["delta"],
     },
   ],
   protein_low: [
     {
-      text: "Protein, kayıtlı günlerin yarısından azında hedefteydi. Mutfağa küçük bir hatırlatma.",
-      slots: [],
+      text: "Protein hedefi kayıtlı günlerin yarısından azında karşılandı ({hit}/{logged}).",
+      slots: ["hit", "logged"],
     },
     {
-      text: "Protein hanesi bu dönem sessiz kaldı ({hit}/{logged}). Koçun menüye bakacaktır.",
-      slots: ["hit", "logged"],
+      text: "Protein alımı bu dönem hedefin gerisinde kaldı — menü koçla gözden geçirilebilir.",
+      slots: [],
     },
   ],
 };
@@ -271,6 +356,6 @@ export const EDITOR_NOTES: Record<Caution["type"], Template[]> = {
 
 export const CLOSING_LINES: Template[] = [
   { text: "Sonraki sayıda görüşmek üzere.", slots: [] },
-  { text: "Baskı bitti; iş bitmedi. Sonraki sayıda buluşalım.", slots: [] },
-  { text: "Bu sayı arşive girdi. Sıradaki manşet senin elinde.", slots: [] },
+  { text: "Bu sayı arşive kaldırıldı; kayıt sürüyor.", slots: [] },
+  { text: "Rapor tamamlandı. Sıradaki dönem şimdiden açık.", slots: [] },
 ];
