@@ -129,13 +129,19 @@ export const HEADLINES: Record<FactType, Template[]> = {
       match: (s) => s.sessions === s.planned,
     },
     {
+      text: "Planın üzerine çıkıldı: {planned} yerine {sessions} antrenman",
+      slots: ["planned", "sessions"],
+      match: (s) => Number(s.sessions) > Number(s.planned),
+    },
+    {
       text: "Program yüksek oranda uygulandı: {sessions}/{planned} antrenman",
       slots: ["sessions", "planned"],
-      match: (s) => s.sessions !== s.planned,
+      match: (s) => Number(s.sessions) < Number(s.planned),
     },
     {
       text: "Devamlılık tablosu net: {sessions}/{planned} antrenman",
       slots: ["sessions", "planned"],
+      match: (s) => Number(s.sessions) <= Number(s.planned),
     },
   ],
   volume_trend: [
@@ -227,6 +233,7 @@ export const STORY_BODIES: Record<FactType, Template[]> = {
     {
       text: "Devamlılık bu {period} da bozulmadı: {sessions}/{planned}.",
       slots: ["period", "sessions", "planned"],
+      match: (s) => Number(s.sessions) <= Number(s.planned),
     },
   ],
   volume_trend: [

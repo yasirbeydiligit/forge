@@ -173,13 +173,13 @@ export function extractFacts(input: {
   if (cur.weeklyTargetDays != null && cur.weeklyTargetDays > 0) {
     const weeks = cur.daysInPeriod / 7;
     const planned = Math.round(cur.weeklyTargetDays * weeks);
-    if (planned > 0 && cur.sessionsCompleted / planned >= CONSISTENCY_PRAISE_RATIO) {
-      const ratio = cur.sessionsCompleted / planned;
+    if (planned > 0 && cur.sessionsTrained / planned >= CONSISTENCY_PRAISE_RATIO) {
+      const ratio = cur.sessionsTrained / planned;
       facts.push({
         type: "consistency",
         score: SCORE.consistency + Math.min(ratio, 1.2) * 20,
         direction: "positive",
-        slots: { ...periodSlots, sessions: cur.sessionsCompleted, planned },
+        slots: { ...periodSlots, sessions: cur.sessionsTrained, planned },
         fill: Math.min(ratio, 1),
       });
     }
@@ -287,7 +287,7 @@ export function extractFacts(input: {
   }
 
   // ---- Best session ----
-  if (cur.bestSession && cur.bestSession.sets > 0 && cur.sessionsCompleted > 1) {
+  if (cur.bestSession && cur.bestSession.sets > 0 && cur.sessionsTrained > 1) {
     facts.push({
       type: "best_session",
       score: SCORE.best_session,

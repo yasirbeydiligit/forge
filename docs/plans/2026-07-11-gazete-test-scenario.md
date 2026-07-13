@@ -78,3 +78,24 @@ Temp fixture rotaları `src/app/offline/ornek-gazete/*` (silindi) + scratchpad
   bırakıldı; aynı kod yolları yukarıdaki üç katmanla örtülü.
 - Nav sinyalindeki "basılmamış dönem" sayısı üst sınırdır (boş dönem
   bilinemez); ilk ziyarette kendini düzeltir (tasarım kararı).
+
+## Ek — v2 içerik revizyonu doğrulaması (2026-07-13)
+
+Kullanıcı geri bildirimi sonrası (dil + kapsam): gazete-nötr Türkçe ses,
+ANTRENMAN/BESLENME/TAKİP bölümleri, payload v2. Eski sayılar silindi (onaylı).
+
+- **Saf katman:** 86 gazete testi (436 toplam). Yeni garantiler: dinamik slota
+  kesme işaretli ek yasağı (regex testi), tekil/çoğul + korundu/değişti +
+  plan-aşımı match seçimi ("5/3 antrenman" kalıbı 30 seed'de asla), kas
+  tablosunda set-başına-kas tekilliği, PR bölge gruplaması, kcal bant
+  üstü/altı sayacı, su hedef günleri, metrik trend + polarite (muscle_gain'de
+  kilo artışı yeşil, açlık artışı gri).
+- **Seans semantiği düzeltildi:** set girilen ama "bitir"e basılmayan seans
+  antrenman sayılır (canlı veride "0 seans, 15 set" çelişkisi yakalandı).
+- **Canlı üretim (demo sporcu):** 7 sayı basıldı, 2. çalıştırma 0 (idempotens);
+  manşetler doğal ("Planın üzerine çıkıldı: 3 yerine 6 antrenman", "Bu hafta
+  2 kişisel rekor kırıldı"); satırlar temizlendi.
+- **Görsel (CDP 390×844 + 1280):** taşma yok; bölüm tabloları, rekor panosu,
+  kapak kası köşesi, kcal bant kutuları, protokol dolumu, trend okları
+  (hesaplanmış renk doğrulandı: better=true → primary), Türkçe binlik/ondalık
+  her yerde ("2.430 kcal", "1,8 kg").

@@ -27,7 +27,7 @@ import { PaperCard } from "@/components/lab/lab";
 import { differenceInCalendarDays } from "date-fns";
 import type { IssuePayload } from "@/lib/gazete/build-issue";
 import { trNum } from "@/lib/gazete/copy";
-import { formatNumber, parseDateKey } from "@/lib/format";
+import { parseDateKey } from "@/lib/format";
 import { periodLabel, type Period } from "@/lib/gazete/periods";
 import { cn } from "@/lib/utils";
 
@@ -108,7 +108,7 @@ export function IssueView({
                 counter.textContent =
                   decimals > 0
                     ? proxy.n.toFixed(decimals).replace(".", ",")
-                    : formatNumber(Math.round(proxy.n));
+                    : trNum(Math.round(proxy.n));
               },
             },
             "<0.1",
@@ -186,7 +186,7 @@ export function IssueView({
                   data-issue-count={payload.lead.stat.value}
                   suppressHydrationWarning
                 >
-                  {formatNumber(payload.lead.stat.value)}
+                  {trNum(payload.lead.stat.value)}
                 </span>
                 {payload.lead.stat.suffix}
               </span>
@@ -467,10 +467,10 @@ function BeslenmeSection({ data }: { data: NonNullable<Sections["beslenme"]> }) 
         <div>
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <span className="font-serif text-3xl font-medium tracking-tight text-lab-ink">
-              {formatNumber(data.kcal.avg)} kcal
+              {trNum(data.kcal.avg)} kcal
             </span>
             <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-              günlük ortalama{data.kcal.target != null ? ` · hedef ${formatNumber(data.kcal.target)}` : ""}
+              günlük ortalama{data.kcal.target != null ? ` · hedef ${trNum(data.kcal.target)}` : ""}
               {" · "}
               {data.daysLogged} gün kayıt
             </span>
@@ -519,11 +519,11 @@ function BeslenmeSection({ data }: { data: NonNullable<Sections["beslenme"]> }) 
             m.value != null ? (
               <div key={m.label}>
                 <dd className="font-serif text-xl font-medium text-lab-ink">
-                  {formatNumber(m.value)} g
+                  {trNum(m.value)} g
                 </dd>
                 <dt className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
                   ort. {m.label}
-                  {m.target != null ? ` / ${formatNumber(m.target)}` : ""}
+                  {m.target != null ? ` / ${trNum(m.target)}` : ""}
                 </dt>
               </div>
             ) : null,
@@ -595,7 +595,7 @@ function TakipSection({ data }: { data: NonNullable<Sections["takip"]> }) {
           {data.water ? (
             <p className="font-mono text-xs text-foreground/85">
               <span className="font-bold uppercase tracking-wider text-lab-blue">Su</span>{" "}
-              ort. {formatNumber(data.water.avgMl)} ml
+              ort. {trNum(data.water.avgMl)} ml
               {data.water.goalMl != null
                 ? ` · hedefe ulaşan gün ${data.water.goalDays}/${data.water.daysLogged}`
                 : ""}

@@ -7,7 +7,7 @@ import { buildIssue, type BuildIssueContext } from "./build-issue";
 function agg(overrides: Partial<PeriodAggregates> = {}): PeriodAggregates {
   return {
     daysInPeriod: 7,
-    sessionsCompleted: 0,
+    sessionsTrained: 0,
     totalSets: 0,
     prCount: 0,
     bestPr: null,
@@ -63,7 +63,7 @@ function richInput() {
     goal: "muscle_gain" as TrainingGoal,
     periodType: "weekly" as const,
     current: agg({
-      sessionsCompleted: 4,
+      sessionsTrained: 4,
       totalSets: 62,
       prCount: 3,
       bestPr: { exercise: "Bench Press", weight: 105, reps: 5 },
@@ -116,7 +116,7 @@ function richInput() {
     previous: agg({
       sleepAvg: 7.1,
       totalSets: 50,
-      sessionsCompleted: 3,
+      sessionsTrained: 3,
       metricAvgs: { weight: 71.0, sleep_hours: 7.1, energy: 8.1, steps: 8000 },
     }) as PeriodAggregates | null,
   };
@@ -137,7 +137,7 @@ describe("buildIssue — boş dönem", () => {
     const payload = buildIssue(ctx, {
       goal: null,
       periodType: "weekly",
-      current: agg({ sessionsCompleted: 1, totalSets: 8 }),
+      current: agg({ sessionsTrained: 1, totalSets: 8 }),
       previous: null,
     });
     expect(payload).not.toBeNull();
@@ -220,7 +220,7 @@ describe("buildIssue — zengin dönem", () => {
     const empty = buildIssue(ctx, {
       goal: null,
       periodType: "weekly",
-      current: agg({ sessionsCompleted: 1, totalSets: 8 }),
+      current: agg({ sessionsTrained: 1, totalSets: 8 }),
       previous: null,
     })!;
     expect(empty.sections.beslenme).toBeNull();

@@ -91,7 +91,9 @@ export type NumericMetricKey = Exclude<MetricKey, "notes">;
 export type PeriodAggregates = {
   daysInPeriod: number;
   // ---- Training ----
-  sessionsCompleted: number;
+  /** Sessions that actually happened: completed OR carrying ≥1 logged set
+   *  (an athlete who logs sets but forgets "finish" still trained). */
+  sessionsTrained: number;
   totalSets: number;
   setsPerSession: number | null;
   avgRir: number | null;
@@ -302,17 +304,19 @@ export function aggregatePeriod(
     return v == null ? null : Math.round(v);
   };
 
-  const sessionsCompleted = rows.sessions.filter((s) => s.completed).length;
+  const trainedIds = new Set(rows.sets.map((s) => s.sessionId));
+  for (const sess of rows.sessions) if (sess.completed) trainedIds.add(sess.id);
+  const sessionsTrained = trainedIds.size;
   const totalSets = rows.sets.length;
   const stepsMean = mean(series.steps);
 
   return {
     daysInPeriod:
       differenceInCalendarDays(parseDateKey(period.end), parseDateKey(period.start)) + 1,
-    sessionsCompleted,
+    sessionsTrained,
     totalSets,
     setsPerSession:
-      sessionsCompleted > 0 ? round1(totalSets / sessionsCompleted) : null,
+      sessionsTrained > 0 ? round1(totalSets / sessionsTrained) : null,
     avgRir: rirValues.length > 0 ? round1(mean(rirValues)!) : null,
     prCount,
     bestPr,

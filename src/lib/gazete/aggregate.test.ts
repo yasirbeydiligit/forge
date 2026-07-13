@@ -69,18 +69,35 @@ describe("aggregatePeriod — antrenman", () => {
       setRow({ sessionId: "s2", exerciseId: "e2", date: "2026-07-01", weight: 120, reps: 3, rir: 1 }),
     ];
     const agg = aggregatePeriod(WEEK, rows);
-    expect(agg.sessionsCompleted).toBe(2);
+    expect(agg.sessionsTrained).toBe(2);
     expect(agg.totalSets).toBe(3);
     expect(agg.setsPerSession).toBe(1.5);
     expect(agg.avgRir).toBe(2);
   });
 
-  it("RIR hiç loglanmadıysa avgRir null; seans yoksa setsPerSession null", () => {
+  it("RIR hiç loglanmadıysa avgRir null; set girilen seans 'yapılmış' sayılır (bitir'e basılmasa da)", () => {
     const rows = emptyRows();
     rows.sets = [setRow({ sessionId: "s1", exerciseId: "e1", date: "2026-06-29" })];
     const agg = aggregatePeriod(WEEK, rows);
     expect(agg.avgRir).toBeNull();
-    expect(agg.setsPerSession).toBeNull();
+    expect(agg.sessionsTrained).toBe(1); // completed=false ama seti var → antrenman yapılmış
+    expect(agg.setsPerSession).toBe(1);
+  });
+
+  it("hiç set ve seans yoksa setsPerSession null", () => {
+    expect(aggregatePeriod(WEEK, emptyRows()).setsPerSession).toBeNull();
+  });
+
+  it("plan aşımı: 3 planlıya 5 antrenman şablonu '5/3' gibi okunmaz", () => {
+    // Bu davranış copy.test'te de korunuyor; burada sadece fact slotları doğrulanır.
+    const rows = emptyRows();
+    rows.weeklyTargetDays = 3;
+    rows.sessions = Array.from({ length: 5 }, (_, i) => ({
+      id: `s${i}`,
+      date: "2026-06-29",
+      completed: true,
+    }));
+    expect(aggregatePeriod(WEEK, rows).sessionsTrained).toBe(5);
   });
 
   it("kas bazında set: primary rol, set başına kas BİR kez (iki fonksiyon olsa da), desc sıralı", () => {

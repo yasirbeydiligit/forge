@@ -13,7 +13,7 @@ import {
 function baseAgg(overrides: Partial<PeriodAggregates> = {}): PeriodAggregates {
   return {
     daysInPeriod: 7,
-    sessionsCompleted: 0,
+    sessionsTrained: 0,
     totalSets: 0,
     prCount: 0,
     bestPr: null,
@@ -164,11 +164,11 @@ describe("dürüstlük garantileri", () => {
   it("%79 tutarlılık övgü değil; %80 övgü (eşik CONSISTENCY_PRAISE_RATIO)", () => {
     // Hedef 5 gün/hafta → 7 günlük dönemde hedef 5 seans.
     const below = extractFacts(
-      input({ sessionsCompleted: 3, weeklyTargetDays: 5, totalSets: 30 }),
+      input({ sessionsTrained: 3, weeklyTargetDays: 5, totalSets: 30 }),
     );
     expect(below.facts.find((f) => f.type === "consistency")).toBeUndefined();
     const at = extractFacts(
-      input({ sessionsCompleted: 4, weeklyTargetDays: 5, totalSets: 30 }),
+      input({ sessionsTrained: 4, weeklyTargetDays: 5, totalSets: 30 }),
     );
     expect(at.facts.find((f) => f.type === "consistency")).toBeDefined();
     expect(4 / 5).toBeGreaterThanOrEqual(CONSISTENCY_PRAISE_RATIO);
@@ -257,7 +257,7 @@ describe("pozitif fact üretimi", () => {
         newExercises: ["Bulgarian Split Squat"],
         bestSession: { date: "2026-07-02", sets: 24 },
         totalSets: 60,
-        sessionsCompleted: 4, // tek seanslı dönemde "en iyi seans" haber değildir
+        sessionsTrained: 4, // tek seanslı dönemde "en iyi seans" haber değildir
       }),
     );
     expect(facts.find((f) => f.type === "new_exercises")?.slots.first).toBe(

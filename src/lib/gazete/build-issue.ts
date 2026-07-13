@@ -130,7 +130,7 @@ export type BuildIssueContext = {
 function hasAnyData(cur: PeriodAggregates): boolean {
   return (
     cur.totalSets > 0 ||
-    cur.sessionsCompleted > 0 ||
+    cur.sessionsTrained > 0 ||
     cur.weightSamples > 0 ||
     Object.keys(cur.metricAvgs).length > 0 ||
     cur.nutritionDaysLogged > 0 ||
@@ -209,9 +209,9 @@ function foldMuscleRows(
 }
 
 function buildAntrenman(cur: PeriodAggregates) {
-  if (cur.totalSets === 0 && cur.sessionsCompleted === 0) return null;
+  if (cur.totalSets === 0 && cur.sessionsTrained === 0) return null;
   return {
-    sessions: cur.sessionsCompleted,
+    sessions: cur.sessionsTrained,
     totalSets: cur.totalSets,
     setsPerSession: cur.setsPerSession,
     avgRir: cur.avgRir,

@@ -81,6 +81,18 @@ describe("renderTemplate — sayıya duyarlı seçim", () => {
     expect(multi).toMatch(/4/);
   });
 
+  it("plan aşımında '5/3' kalıbı asla seçilmez", () => {
+    for (let i = 0; i < 30; i++) {
+      const out = renderTemplate(
+        HEADLINES.consistency,
+        { sessions: 5, planned: 3, period: "hafta" },
+        `seed-${i}`,
+      );
+      expect(out).not.toBeNull();
+      expect(out).not.toContain("5/3");
+    }
+  });
+
   it("hiçbir şablon uymuyorsa null döner", () => {
     expect(renderTemplate([{ text: "x", slots: [], match: () => false }], {}, "s")).toBeNull();
   });
@@ -136,7 +148,7 @@ describe("havuz bütünlüğü — her fact tipi konuşabilmeli", () => {
       periodType: "weekly",
       current: {
         daysInPeriod: 7,
-        sessionsCompleted: 4,
+        sessionsTrained: 4,
         totalSets: 60,
         prCount: 3,
         bestPr: { exercise: "Bench Press", weight: 105, reps: 5 },
@@ -178,7 +190,7 @@ describe("havuz bütünlüğü — her fact tipi konuşabilmeli", () => {
       },
       previous: {
         daysInPeriod: 7,
-        sessionsCompleted: 3,
+        sessionsTrained: 3,
         totalSets: 50,
         prCount: 0,
         bestPr: null,

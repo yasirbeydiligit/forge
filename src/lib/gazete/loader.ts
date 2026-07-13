@@ -436,7 +436,7 @@ export async function generateDueIssues(
       // An entirely empty previous period is no comparator (no fake trends).
       previous =
         prevAgg.totalSets > 0 ||
-        prevAgg.sessionsCompleted > 0 ||
+        prevAgg.sessionsTrained > 0 ||
         prevAgg.weightSamples > 0 ||
         prevAgg.nutritionDaysLogged > 0
           ? prevAgg
